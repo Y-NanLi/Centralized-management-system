@@ -53,5 +53,5 @@ export function register(router) {
     try { fs.unlinkSync(absFile(row)); } catch { /* 已不存在 */ }
     run('DELETE FROM files WHERE id=?', id);
     return { ok: true };
-  }, { roles: ['admin', 'manager'] });
+  }, { roles: ['admin', 'manager', 'guest'] });
 }

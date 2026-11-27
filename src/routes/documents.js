@@ -14,10 +14,10 @@ function withPayload(row) {
   return { ...rest, payload };
 }
 
-function docDetail(id) {
+function docDetail(id, user) {
   const d = get(`SELECT d.*, c.name AS customer_name, c.addr AS customer_addr, c.contact AS customer_contact,
       c.phone AS customer_phone, c.fax AS customer_fax, co.code AS company_code, co.name AS company_name,
-      u.name AS owner_name
+      u.name AS owner_name, u.role AS owner_role
     FROM documents d
     LEFT JOIN customers c ON c.id=d.customer_id
     LEFT JOIN companies co ON co.id=d.company_id
@@ -71,7 +71,7 @@ export function register(router) {
     return { items: rows, total, page, page_size: pageSize };
   });
 
-  router.get('/api/documents/:id', (ctx) => docDetail(Number(ctx.params.id)));
+  router.get('/api/documents/:id', (ctx) => docDetail(Number(ctx.params.id), ctx.user));
 
   router.post('/api/documents', (ctx) => {
     const body = ctx.body || {};
@@ -90,7 +90,7 @@ export function register(router) {
       doc_no: body.doc_no,
     }, ctx.user);
     audit(ctx.user.id, 'doc.create', doc.doc_no, `${TYPE_LABEL[doc.type]} ${money(doc.amount)}`, ctx.req.socket.remoteAddress);
-    return docDetail(doc.id);
+    return docDetail(doc.id, ctx.user);
   });
 
   router.put('/api/documents/:id', (ctx) => {
@@ -125,7 +125,7 @@ export function register(router) {
       new Date().toISOString(), id);
     if (payload) saveProducts(payload.items || []);
     audit(ctx.user.id, 'doc.update', no, TYPE_LABEL[d.type], ctx.req.socket.remoteAddress);
-    return docDetail(id);
+    return docDetail(id, ctx.user);
   });
 
   router.del('/api/documents/:id', (ctx) => {
@@ -137,7 +137,7 @@ export function register(router) {
     run('DELETE FROM documents WHERE id=?', id);
     audit(ctx.user.id, 'doc.delete', d.doc_no, TYPE_LABEL[d.type], ctx.req.socket.remoteAddress);
     return { ok: true };
-  }, { roles: ['admin', 'manager'] });
+  }, { roles: ['admin', 'manager', 'guest'] });
 
   router.post('/api/documents/:id/status', (ctx) => {
     const id = Number(ctx.params.id);
@@ -147,12 +147,12 @@ export function register(router) {
     const allowed = (STATUSES[d.type] || []).map(([k]) => k);
     if (!allowed.includes(status)) throw bad('状态不合法');
     run('UPDATE documents SET status=?, updated_at=? WHERE id=?', status, new Date().toISOString(), id);
-    return docDetail(id);
+    return docDetail(id, ctx.user);
   });
 
   router.post('/api/documents/:id/convert', (ctx) => {
     const id = Number(ctx.params.id);
-    const src = docDetail(id);
+    const src = docDetail(id, ctx.user);
     const to = ctx.body.to;
     if (to === 'contract' && src.type === 'quote') {
       const q = src.payload;
@@ -176,7 +176,7 @@ export function register(router) {
         title: `${p.cust.name} 销售合同`, remark: p.remark,
       }, ctx.user);
       audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, '报价单转合同', ctx.req.socket.remoteAddress);
-      return docDetail(doc.id);
+      return docDetail(doc.id, ctx.user);
     }
     if (to === 'delivery' && ['contract', 'quote'].includes(src.type)) {
       const q = src.payload;
@@ -205,7 +205,7 @@ export function register(router) {
         title: `${name} 送货单`,
       }, ctx.user);
       audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, '转送货单', ctx.req.socket.remoteAddress);
-      return docDetail(doc.id);
+      return docDetail(doc.id, ctx.user);
     }
     throw bad('不支持这种转换');
   });
@@ -226,7 +226,7 @@ export function register(router) {
 
   router.post('/api/documents/:id/files', async (ctx) => {
     const id = Number(ctx.params.id);
-    const d = get('SELECT id FROM documents WHERE id=?', id);
+    const d = get('SELECT id,owner_id FROM documents WHERE id=?', id);
     if (!d) throw notFound('单据不存在');
     const form = await ctx.form();
     const category = str(ctx.query.get('category'), 30) || 'attachment';
@@ -248,5 +248,5 @@ export function register(router) {
     const fileId = Number(ctx.params.fileId);
     run('DELETE FROM document_files WHERE document_id=? AND file_id=?', docId, fileId);
     return { ok: true };
-  }, { roles: ['admin', 'manager'] });
+  }, { roles: ['admin', 'manager', 'guest'] });
 }

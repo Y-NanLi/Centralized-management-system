@@ -7,7 +7,7 @@ const ROLES = ['admin', 'manager', 'sales'];
 
 export function register(router) {
   router.get('/api/users', () => all(
-    'SELECT id,username,name,role,phone,active,created_at,updated_at FROM users ORDER BY id'
+    "SELECT id,username,name,role,phone,active,created_at,updated_at FROM users WHERE role<>'guest' ORDER BY id"
   ), { roles: ['admin'] });
 
   router.post('/api/users', (ctx) => {

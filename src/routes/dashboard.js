@@ -8,11 +8,13 @@ export function register(router) {
   router.get('/api/dashboard', () => {
     const thisMonth = monthKey();
     const counts = Object.fromEntries(['quote', 'contract', 'delivery'].map((t) => [t,
-      get("SELECT COUNT(*) AS c FROM documents WHERE type=? AND substr(doc_date,1,7)=?", t, thisMonth).c]));
-    const amount = Object.fromEntries(['quote', 'contract', 'delivery'].map((t) => [t,
-      get("SELECT COALESCE(SUM(amount),0) AS s FROM documents WHERE type=? AND status NOT IN ('canceled','closed')", t).s]));
+      get('SELECT COUNT(*) AS c FROM documents WHERE type=? AND substr(doc_date,1,7)=?', t, thisMonth).c]));
+    const amount = {};
+    for (const t of ['quote', 'contract', 'delivery']) {
+      amount[t] = get("SELECT COALESCE(SUM(amount),0) AS s FROM documents WHERE type=? AND status NOT IN ('canceled','closed')", t).s;
+    }
 
-    const status = all(`SELECT type,status,COUNT(*) AS c FROM documents GROUP BY type,status`);
+    const status = all('SELECT type,status,COUNT(*) AS c FROM documents GROUP BY type,status');
 
     const recent = all(`SELECT d.id,d.doc_no,d.type,d.status,d.doc_date,d.amount,d.title,c.name AS customer_name
       FROM documents d LEFT JOIN customers c ON c.id=d.customer_id

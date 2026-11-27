@@ -44,7 +44,7 @@ export async function dispatch(req, res, url, body, raw) {
 
   let user = null;
   if (route.auth) {
-    user = requireUser(req, url);
+    user = requireUser(req, res, url);
     requireRole(user, route.roles);
   }
 

@@ -21,10 +21,10 @@ const statusLabel = (t, s) => {
   const list = (state.meta && state.meta.statuses && state.meta.statuses[t]) || [];
   return (list.find((x) => x.key === s) || {}).label || s;
 };
-const roleLabel = (r) => ({ admin: '管理员', manager: '主管', sales: '业务员' }[r] || r);
+const roleLabel = (r) => ({ admin: '管理员', manager: '主管', sales: '业务员', guest: '游客' }[r] || r);
 
 function fileUrl(id) {
-  return `/api/files/${id}/raw?token=${encodeURIComponent(state.token)}`;
+  return `/api/files/${id}/raw${state.token ? '?token=' + encodeURIComponent(state.token) : ''}`;
 }
 
 async function api(path, opts = {}) {
@@ -92,10 +92,9 @@ function logout() {
   state.token = '';
   state.user = null;
   guestMode = true;
-  location.hash = '';
+  history.replaceState(null, '', '#/dashboard');
   startGuest();
 }
-
 /* ---------------- 登录 ---------------- */
 function renderLogin(msg) {
   document.body.classList.remove('printing');
@@ -106,8 +105,9 @@ function renderLogin(msg) {
       <div class="field"><label>账号</label><input class="input" name="username" autocomplete="username" placeholder="请输入账号" autofocus></div>
       <div class="field"><label>密码</label><input class="input" type="password" name="password" autocomplete="current-password" placeholder="请输入密码"></div>
       <button class="btn primary" style="width:100%;justify-content:center;padding:10px" type="submit">登 录</button>
-      <div class="login-note">首次使用：管理员 admin / admin123，登录后请到「系统设置」修改密码。<br>数据保存在服务器，多人共用同一套客户与单据。</div>
-      <div style="text-align:center;margin-top:14px"><a href="#/" style="font-size:12.5px;color:#6b7688">← 不登录，直接用游客模式开单</a></div>
+      <div class="login-note">首次使用：管理员 admin / admin123，登录后请到「系统设置」修改密码。<br>
+      当前浏览器的游客单据会归属到登录账号；同一份游客数据只会合并一次，之后换账号登录不会再合并。</div>
+      <div style="text-align:center;margin-top:14px"><a href="#/" id="toGuest" style="font-size:12.5px;color:#6b7688">← 不登录，继续用游客模式</a></div>
     </form></div>`;
   const form = document.getElementById('loginForm');
   form.onsubmit = async (e) => {
@@ -120,9 +120,15 @@ function renderLogin(msg) {
       guestMode = false;
       localStorage.setItem('token', r.token);
       await loadBase();
-      if (!location.hash) location.hash = '#/dashboard';
+      if (!location.hash || location.hash === '#/login') location.hash = '#/dashboard';
       renderShell();
       route();
+      const m = r.merged;
+      if (m && (m.documents || m.files || m.customers)) {
+        toast(`登录成功，已合并游客数据：${m.documents} 张单据、${m.files} 个文件、${m.customers} 个客户`);
+      } else {
+        toast('登录成功');
+      }
     } catch (err) {
       renderLogin(err.message);
     }
@@ -149,7 +155,8 @@ const NAV = [
 ];
 
 function renderShell() {
-  const nav = NAV.filter((n) => !n.admin || state.user.role === 'admin').map((n) => `
+  const isGuest = state.user.role === 'guest';
+  const nav = NAV.filter((n) => (!n.admin || state.user.role === 'admin') && (!isGuest || n.key !== 'settings')).map((n) => `
     <a class="nav-item" data-nav="${n.key}" href="${n.href}"><span class="ic">${n.icon}</span>${n.label}</a>`).join('');
   app.innerHTML = `<div class="shell">
       <aside class="sidebar">
@@ -157,17 +164,22 @@ function renderShell() {
         <nav class="nav">${nav}</nav>
         <div class="userbox">
           <div class="avatar">${esc((state.user.name || state.user.username).slice(0, 1))}</div>
-          <div class="who"><b>${esc(state.user.name || state.user.username)}</b><span>${esc(roleLabel(state.user.role))}</span></div>
-          <div class="out" id="btnLogout">退出</div>
+          <div class="who"><b>${esc(state.user.name || state.user.username)}</b><span>${esc(roleLabel(state.user.role))}${isGuest ? ' · 免登录' : ''}</span></div>
+          ${isGuest ? '<a class="out" id="btnLogin" href="#/login">登录</a>' : '<div class="out" id="btnLogout">退出</div>'}
         </div>
       </aside>
       <div class="main">
         <div class="topbar"><div class="crumb" id="crumb">工作台</div><div class="spacer"></div>
-          <div class="tiny" id="topInfo"></div></div>
+          <div class="tiny" id="topInfo">${isGuest ? '游客模式：数据保存在服务器共享库；登录后本浏览器的游客单据归属到你的账号（只合并一次）' : ''}</div></div>
         <div class="content" id="view"></div>
       </div>
     </div>`;
-  document.getElementById('btnLogout').onclick = logout;
+  if (isGuest) {
+    const b = document.getElementById('btnLogin');
+    if (b) b.onclick = () => { location.hash = '#/login'; };
+  } else {
+    document.getElementById('btnLogout').onclick = logout;
+  }
 }
 
 function setNav(key, crumb) {
@@ -202,6 +214,8 @@ let seq = 0;
 async function route() {
   if (!state.user) return;
   const r = parseHash();
+  if (r.path === '/login' && state.user.role === 'guest') { renderLogin(); return; }
+  if (!document.getElementById('view')) renderShell();
   const my = ++seq;
   try {
     const fn = routes[r.path] || pageDashboard;
@@ -252,7 +266,7 @@ async function pageDashboard(q, my) {
       <td class="tiny">${esc(x.doc_date)}</td></tr>`).join('');
 
   const v = view(`
-    <div class="page-head"><div><h2>工作台</h2><div class="desc">${esc(d.month)} 业务概览 · 数据存在服务器，任何电脑登录都看到同一套</div></div>
+    <div class="page-head"><div><h2>工作台</h2><div class="desc">${esc(d.month)} 业务概览 · ${state.user.role === 'guest' ? '游客与账号共用服务器数据，登录后游客单据归属到账号' : '数据存在服务器，任何电脑登录都看到同一套'}</div></div>
       <div class="actions"><button class="btn primary" data-new="quote">+ 报价单</button><button class="btn" data-new="contract">+ 合同</button><button class="btn" data-new="delivery">+ 送货单</button></div></div>
 
     <div class="stat-grid">
@@ -1812,13 +1826,19 @@ function guestRoute() {
 async function startGuest() {
   guestMode = true;
   try {
-    const b = await api('/public/bootstrap');
-    state.guestCompanies = b.companies;
+    const r = await api('/auth/guest');
+    state.token = '';
+    state.user = r.user;
+    await loadBase();
+    renderShell();
+    if (!location.hash) history.replaceState(null, '', '#/dashboard');
+    route();
   } catch {
-    state.guestCompanies = FALLBACK_COMPANIES;
+    // 服务端不可用时退回纯本地游客页
+    try { state.guestCompanies = (await api('/public/bootstrap')).companies; } catch { state.guestCompanies = FALLBACK_COMPANIES; }
+    renderGuestShell();
+    guestRoute();
   }
-  renderGuestShell();
-  guestRoute();
 }
 
 /* ---------------- 启动 ---------------- */
