@@ -1,0 +1,15 @@
+{
+  "name": "jizhong-guanli-system",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "报价单 / 销售合同 / 送货单 一体化管理系统（Node.js + SQLite，零第三方依赖）",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  }
+}

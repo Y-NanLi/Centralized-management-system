@@ -1,0 +1,14 @@
+services:
+  jizhong:
+    build: .
+    image: jizhong-management:latest
+    container_name: jizhong-management
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    environment:
+      TZ: Asia/Shanghai
+      # 生产环境建议改成固定密钥，否则每次重建容器会随机生成（只影响登录态，不影响数据）
+      # APP_SECRET: 换成你自己的长随机字符串
+    volumes:
+      - ./data:/app/data
