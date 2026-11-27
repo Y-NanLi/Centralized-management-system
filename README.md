@@ -1,6 +1,6 @@
 # 集中管理系统（报价 / 合同 / 送货单）
 
-> 当前版本：**v1.2**（2026-11-28）
+> 当前版本：**v1.3**（2026-11-28）
 
 把原来三个「单文件 HTML + 浏览器 localStorage」工具的数据，统一收拢到一台服务器上：
 **一套客户档案、一套货品库、一条报价 → 合同 → 送货单的业务链、一个文件库、一套账号权限**。
@@ -142,7 +142,10 @@ Compress-Archive -Path .\data -DestinationPath "D:\backup\jizhong-$(Get-Date -Fo
 │   └── routes/            auth / users / base / documents / files / dashboard / import
 ├── web/
 │   ├── index.html
-│   └── assets/             app.css、app.js（全部前端）
+│   └── assets/
+│       ├── app.css
+│       ├── app.js              入口：登录、游客身份、路由表
+│       └── js/                 core / shell / editor / print / pages/*
 ├── data/                  运行时数据（不入库）
 ├── Dockerfile
 ├── docker-compose.yml
@@ -235,5 +238,6 @@ node tools/reset-password.js admin 你的新密码
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
+| v1.3 | 2026-11-28 | 前端按页面拆分为原生 ES Module：`app.js` 从 1858 行缩减为 136 行入口，新增 `js/core.js`、`shell.js`、`editor.js`、`print.js` 与 `pages/*`；删除废弃的本地游客逻辑，清理旧游客样式；三单、打印、游客共享与一次性合并逻辑保持不变 |
 | v1.2 | 2026-11-28 | 游客模式改为服务端持久身份（cookie `gid` + 临时 `guest` 账号），登录时一次性合并游客数据；开放游客删单/删文件；权限矩阵与接口文档同步 |
 | v1.1 | 2026-11-27 | 首个版本：报价单 / 销售合同 / 送货单三单联动、客户货品档案、文件库、账号权限、Docker 部署 |
