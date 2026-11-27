@@ -21,7 +21,7 @@ async function pageDocs(q, my) {
     : Object.values(state.meta.statuses).flat().filter((s, i, arr) => arr.findIndex((x) => x.key === s.key) === i)
       .map((s) => `<option value="${s.key}" ${s.key === status ? 'selected' : ''}>${s.label}</option>`).join('');
 
-  const rows = data.items.map((x) => `<tr class="clickable" data-id="${x.id}">
+  const rows = data.items.map((x) => `<tr class="clickable" data-id="${x.id}" title="点击进入编辑 / 预览">
       <td><span class="type-tag ${x.type}">${typeLabel(x.type)}</span></td>
       <td class="mono">${esc(x.doc_no)}</td>
       <td>${esc(x.customer_name || '—')}</td>
@@ -56,7 +56,7 @@ async function pageDocs(q, my) {
     </div>`, 'docs', '单据中心 / ' + (type ? typeLabel(type) : '全部'));
 
   v.querySelectorAll('[data-new]').forEach((b) => b.onclick = () => { location.hash = `#/doc/new?type=${b.dataset.new}`; });
-  v.querySelectorAll('tr[data-id]').forEach((tr) => tr.onclick = () => { location.hash = `#/doc?id=${tr.dataset.id}`; });
+  v.querySelectorAll('tr[data-id]').forEach((tr) => tr.onclick = () => { location.hash = `#/doc/edit?id=${tr.dataset.id}`; });
   v.querySelector('#fDoc').onsubmit = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);

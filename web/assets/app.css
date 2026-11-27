@@ -171,6 +171,66 @@ table.tb tr.clickable{cursor:pointer}
 .databar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .chip{background:#f4f7fc;border:1px solid #e3eaf5;color:#41506a;border-radius:99px;padding:3px 10px;font-size:11.5px}
 
+/* ---------- 单据编辑工作台 ---------- */
+.doc-editor-page{height:calc(100vh - 120px);min-height:560px;display:flex;flex-direction:column;gap:12px}
+.doc-topbar{display:flex;align-items:center;gap:8px;background:#123869;color:#fff;border-radius:10px;padding:9px 12px;box-shadow:0 5px 18px rgba(18,56,105,.18);flex:none;flex-wrap:wrap}
+.doc-topbar .dt-title{font-weight:700;font-size:15px;letter-spacing:.5px;padding:2px 10px;border-radius:6px;background:rgba(255,255,255,.1)}
+.doc-topbar .dt-chip{font-size:11.5px;color:#dbe7fb;border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:2px 10px;white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis}
+.doc-topbar .dt-spacer{flex:1}
+.doc-topbar .btn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3);color:#fff;padding:6px 11px;font-size:12.5px}
+.doc-topbar .btn:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)}
+.doc-topbar .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.doc-topbar .btn.primary:hover{background:#b57a22;border-color:#b57a22}
+.doc-workbench{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr);gap:14px}
+.doc-form-pane{min-width:0;overflow:auto;padding-right:5px}
+.doc-form-body{padding-bottom:10px}
+.doc-section{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px 17px;margin-bottom:12px}
+.doc-sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.doc-sec-head h3{margin:0;font-size:14px;letter-spacing:.2px}
+.doc-sec-head span{font-size:11.5px;color:var(--muted)}
+.doc-section .field{margin-bottom:10px}
+.doc-section .field label{font-size:11.5px;margin-bottom:4px}
+.doc-section .grid2{gap:10px 12px}
+.span2{grid-column:1/-1}
+.input-with-btn{display:flex;gap:7px;align-items:stretch}
+.input-with-btn .input{min-width:0}
+.input-with-btn .btn{flex:none}
+.co-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:13px}
+.co-tab{border:1px solid var(--line);background:#f7f9fc;color:#41506a;border-radius:99px;padding:5px 13px;font-size:12.5px;cursor:pointer;line-height:1.2}
+.co-tab:hover{border-color:#c3d2e8;background:#f1f5fb}
+.co-tab.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.check-group{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.check-line{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#41506a;cursor:pointer}
+.check-line input{accent-color:var(--brand)}
+.items-table-wrap{overflow-x:auto}
+.doc-form-pane .items-table{font-size:12px;min-width:480px}
+.doc-form-pane .items-table th{padding:6px 4px}
+.doc-form-pane .items-table input{padding:5px 4px}
+.doc-form-pane .items-table td.amt{font-size:11.5px;padding-right:6px}
+.doc-form-pane .term-row{grid-template-columns:18px 120px 1fr 22px;gap:6px}
+.doc-form-pane .term-row .input{padding:5px 7px;font-size:12px}
+.doc-form-pane .total-line{padding-top:8px;gap:14px}
+.doc-form-pane .total-line .sum{font-size:17px}
+.doc-form-pane .total-line .upper{font-size:11.5px;max-width:58%;text-align:right}
+.doc-preview-pane{min-width:0;display:flex;flex-direction:column;background:#e7ecf4;border:1px solid #d7dfea;border-radius:10px;overflow:hidden}
+.preview-bar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 11px;background:#f7f9fc;border-bottom:1px solid #dfe6ef;font-size:12px;color:#5b687c}
+.preview-zoom{display:flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums}
+.pz-btn{border:1px solid #ccd6e4;background:#fff;color:#41506a;border-radius:5px;min-width:24px;height:24px;cursor:pointer;font-size:12px;line-height:1}
+.pz-btn:hover{background:#f1f5fb;border-color:#b9c8dc}
+.pz-fit{width:auto;padding:0 8px;font-size:11.5px}
+#zoomLabel{min-width:38px;text-align:center;font-size:11.5px;color:#5b687c}
+.preview-scroll{flex:1;min-height:0;overflow:auto;padding:18px 16px 30px;background:#dfe5ee}
+.preview-sizer{position:relative;margin:0 auto;min-width:1px;min-height:1px}
+.preview-stage{position:absolute;left:0;top:0;width:210mm;transform-origin:top left}
+.doc-preview-pane .a4{margin:0;box-shadow:0 5px 20px rgba(15,28,48,.2)}
+
+@media (max-width:1120px){
+  .doc-editor-page{height:auto;min-height:0}
+  .doc-workbench{grid-template-columns:1fr;height:auto}
+  .doc-form-pane{overflow:visible;padding-right:0}
+  .doc-preview-pane{height:70vh;min-height:520px}
+}
+
 /* ---------- 弹窗 / 提示 ---------- */
 .overlay{position:fixed;inset:0;background:rgba(20,30,46,.42);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
 .modal{background:#fff;border-radius:14px;box-shadow:0 18px 60px rgba(15,28,48,.25);width:100%;max-width:560px;max-height:88vh;overflow:auto}
@@ -228,14 +288,105 @@ table.tb tr.clickable{cursor:pointer}
 .a4 .delivery-note{font-size:9pt;margin-top:4mm;color:#333}
 .a4 .page-foot{position:absolute;left:12mm;right:12mm;bottom:6mm;display:flex;justify-content:space-between;font-size:8pt;color:#666}
 
+/* ================= 报价单模板（报价单生成器） ================= */
+.a4.quote-doc{position:relative;padding:12mm 19mm;font-family:"SimSun","宋体",serif;font-size:13px;line-height:1.55;color:#000;box-sizing:border-box}
+.quote-doc .brandHead{text-align:center;margin:0 0 5mm}
+.quote-doc .logo{display:block;width:58mm;max-width:70mm;margin:0 auto}
+.quote-doc .hCompany{font-family:"SimHei","黑体",sans-serif;font-size:calc(17px * var(--kt,1));font-weight:700;letter-spacing:.03em;margin-top:9mm}
+.quote-doc .docTitle{text-align:center;font-family:"SimHei","黑体",sans-serif;font-size:calc(28px * var(--kt,1));font-weight:700;letter-spacing:.3em;text-indent:.3em;margin:0 0 4mm;line-height:1.15}
+.quote-doc table.meta{width:100%;border-collapse:collapse;border:1px solid #000;table-layout:auto}
+.quote-doc table.meta td{border-bottom:1px solid #000;height:8mm;padding:0 5px;font-size:calc(12.5px * var(--ki,1));vertical-align:middle;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.quote-doc table.meta tr:last-child td{border-bottom:0}
+.quote-doc table.meta td.l1{width:1%;padding-left:4px;white-space:nowrap}
+.quote-doc table.meta td.v1{width:38%}
+.quote-doc table.meta td.l2{width:1%;border-left:1px solid #000;white-space:nowrap}
+.quote-doc table.meta td.v2{width:40%}
+.quote-doc table.meta td.bold{font-weight:700}
+.quote-doc .lead{margin:4mm 0 3mm;font-size:calc(12.5px * var(--ki,1));font-weight:700;text-indent:2em}
+.quote-doc table.items{width:100%;border-collapse:collapse;table-layout:fixed}
+.quote-doc table.items th,.quote-doc table.items td{border:1px solid #000;padding:1mm 4px;height:calc(9mm * var(--km,1));font-size:calc(12.5px * var(--km,1));text-align:center;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+.quote-doc table.items th{font-weight:700;font-family:"SimHei","黑体",sans-serif;font-size:calc(12.5px * var(--km,1))}
+.quote-doc table.items thead{display:table-header-group}
+.quote-doc table.items tr{page-break-inside:avoid}
+.quote-doc table.items td.l{text-align:left;padding-left:6px}
+.quote-doc table.items td.r{text-align:right;padding-right:6px;font-variant-numeric:tabular-nums}
+.quote-doc .terms{margin-top:12px;font-size:calc(12px * var(--ki,1));line-height:1.95;position:relative}
+.quote-doc .terms .remark{white-space:pre-wrap}
+.quote-doc .sign{margin-top:18px;display:flex;gap:16px;font-size:calc(12px * var(--ki,1));flex-wrap:wrap;border:0;grid-template-columns:none}
+.quote-doc .sign .sg{display:flex;align-items:flex-end;gap:2px;border:0;padding:0}
+.quote-doc .sign .sg:first-child{border-right:0}
+.quote-doc .sign .sgLine{display:inline-block;border-bottom:.8px solid #000;min-width:90px;height:16px}
+.quote-doc .stampImg{position:absolute;display:block;width:var(--stSize,42mm);height:var(--stSize,42mm);left:var(--stDX,0mm);top:calc(50% - var(--stSize,42mm) / 2 - var(--stDY,0mm));transform:rotate(var(--stRot,0deg));pointer-events:none;z-index:8}
+
+/* ================= 销售合同模板（销售合同生成器） ================= */
+.a4.contract-doc{position:relative;padding:12.7mm;font-family:"SimSun","宋体",serif;color:#000;font-size:10.5pt;line-height:1.5;box-sizing:border-box}
+.contract-doc .brandHead{text-align:center;margin:0 0 4mm}
+.contract-doc .brandHead img{display:block;width:54mm;max-width:60mm;margin:0 auto}
+.contract-doc .docTitle{text-align:center;font-family:"SimHei","黑体",sans-serif;font-weight:700;font-size:calc(18pt * var(--kt,1));letter-spacing:.35em;text-indent:.35em;margin:0 0 3mm;line-height:1.3}
+.contract-doc .noLine{text-align:right;font-size:calc(9pt * var(--ki,1));margin:0 0 3.5mm}
+.contract-doc .party{font-size:calc(10.5pt * var(--ki,1));line-height:1.9;margin:0;overflow-wrap:anywhere}
+.contract-doc .party b{font-weight:700}
+.contract-doc .lead{margin:2.5mm 0 1.5mm;font-size:calc(10.5pt * var(--ki,1));line-height:1.5}
+.contract-doc table.items{width:100%;border-collapse:collapse;table-layout:fixed}
+.contract-doc table.items th,.contract-doc table.items td{border:1px solid #000;padding:1.1mm 1.6mm;font-size:calc(10.5pt * var(--km,1));line-height:1.4;text-align:center;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+.contract-doc table.items th{font-weight:700}
+.contract-doc table.items tbody tr{height:7.6mm}
+.contract-doc table.items td.l{text-align:left}
+.contract-doc table.items td.r{text-align:right;font-variant-numeric:tabular-nums}
+.contract-doc table.items tr.totRow td{font-weight:400}
+.contract-doc table.items tr.totRow td.tl{text-align:right;font-weight:700}
+.contract-doc table.items tr.totRow td.tv{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.contract-doc .upper{margin-top:2.2mm;font-size:calc(10.5pt * var(--ki,1));font-weight:700;line-height:1.6;overflow-wrap:anywhere}
+.contract-doc .remarkBox{margin-top:1mm;font-size:calc(10.5pt * var(--ki,1));line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.contract-doc .terms{margin-top:1.8mm;position:relative}
+.contract-doc .terms p{margin:0 0 .8mm;font-size:calc(12pt * var(--ki,1));line-height:1.6;text-align:justify;text-justify:inter-ideograph;overflow-wrap:anywhere}
+.contract-doc .signWrap{position:relative;margin-top:5mm}
+.contract-doc table.signT{width:100%;border-collapse:collapse;table-layout:fixed}
+.contract-doc table.signT td{padding:.9mm 1.6mm;font-size:calc(11pt * var(--ki,1));line-height:1.6;vertical-align:middle;border:.6pt solid #000;overflow-wrap:anywhere}
+.contract-doc table.signT td:first-child{width:51%}
+.contract-doc table.signT td:last-child{width:49%}
+.contract-doc table.signT td b{font-weight:700}
+.contract-doc .stampImg{position:absolute;display:block;pointer-events:none;z-index:8}
+
+/* ================= 送货单模板（送货单生成器 A4） ================= */
+.a4.delivery-doc{position:relative;padding:0;height:290mm;font-family:"SimSun","宋体",serif;color:#000;font-size:9pt;line-height:1.2;overflow:hidden;box-sizing:border-box}
+.delivery-doc .dv-title{position:absolute;left:10.37mm;top:24.5mm;width:182.1mm;text-align:center;font-family:"SimHei","黑体",sans-serif;font-size:20pt;font-weight:700;line-height:1.1;white-space:nowrap;overflow:hidden}
+.delivery-doc .dv-info{position:absolute;left:10.37mm;top:35.2mm;width:182.1mm;font-size:9pt}
+.delivery-doc .dv-row{display:grid;grid-template-columns:1fr 1fr 1fr;height:6.3mm;align-items:center}
+.delivery-doc .dv-cell{display:flex;align-items:baseline;gap:1.5mm;white-space:nowrap;overflow:hidden}
+.delivery-doc .dv-cell span{flex:none;letter-spacing:.02em}
+.delivery-doc .dv-cell b{font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.delivery-doc .dv-cell.span2{grid-column:span 2}
+.delivery-doc .dv-body{position:absolute;left:10.37mm;top:57.9mm;width:182.1mm}
+.delivery-doc .dv-table{position:static;width:100%;border-collapse:collapse;table-layout:fixed;font-size:9pt}
+.delivery-doc .dv-table th,.delivery-doc .dv-table td{border:.7pt solid #000;text-align:center;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word;white-space:normal;padding:1mm 1.2mm}
+.delivery-doc .dv-table th{height:5.8mm;font-weight:700;line-height:1.2;background:#ccffcc;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.delivery-doc .dv-table td{height:16.2mm;line-height:1.3}
+.delivery-doc .dv-table td.r{text-align:right;font-variant-numeric:tabular-nums}
+.delivery-doc .dv-table .dv-total td{height:5.2mm;font-weight:700}
+.delivery-doc .dv-sign{position:relative;height:4mm;margin-top:4mm;font-size:9pt;line-height:1}
+.delivery-doc .dv-sign span{position:absolute;top:0;white-space:nowrap}
+.delivery-doc .dv-sign span:nth-child(1){left:3.1mm}
+.delivery-doc .dv-sign span:nth-child(2){left:78.6mm}
+.delivery-doc .dv-sign span:nth-child(3){left:152.2mm}
+.delivery-doc .dv-pageno{position:absolute;right:10.37mm;bottom:2.6mm;font-size:7.5pt;color:#4b5563;line-height:1}
+
 @media print{
   body{background:#fff}
-  .print-bar,.sidebar,.topbar,.no-print{display:none!important}
-  .shell{display:block}
+  .print-bar,.sidebar,.topbar,.page-head,.no-print,.doc-topbar,.doc-form-pane,.preview-bar{display:none!important}
+  .shell{display:block;min-height:0!important}
+  .doc-editor-page{height:auto!important;min-height:0!important;display:block!important}
+  .doc-workbench{display:block!important;height:auto!important}
+  .doc-preview-pane{display:block!important;background:#fff!important;border:0!important;overflow:visible!important}
+  .preview-scroll{overflow:visible!important;padding:0!important;background:#fff!important}
+  .preview-sizer{width:auto!important;height:auto!important;min-width:0!important;min-height:0!important}
+  .preview-stage{position:static!important;width:auto!important;transform:none!important}
   .content{padding:0;max-width:none}
-  .print-wrap{background:#fff;padding:0}
+  .print-wrap{background:#fff;padding:0;min-height:0!important}
   .a4{margin:0;box-shadow:none;width:210mm;min-height:auto}
   .a4 .sign{page-break-inside:avoid}
+  .delivery-doc{page-break-inside:avoid;break-inside:avoid}
+  .delivery-doc + .delivery-doc{page-break-before:always;break-before:page}
   @page{size:A4 portrait;margin:0}
 }
 @media (max-width:1100px){
