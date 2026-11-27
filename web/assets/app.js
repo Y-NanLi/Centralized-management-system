@@ -1209,7 +1209,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">集中管理系统 v1.1 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">集中管理系统 v1.2 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 
