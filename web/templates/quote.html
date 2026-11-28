@@ -183,6 +183,26 @@ table.edit .mvBtn:hover{color:var(--accent)}
 @media (max-width:980px){
   .previewPane{display:none}
 }
+@media screen and (max-width:760px){
+  #app{height:auto;min-height:100vh}
+  .topbar{height:auto;min-height:0;padding:8px 10px;flex-wrap:wrap;gap:6px}
+  .topbar .brand{flex:1 0 100%;margin:0}
+  .topbar .tag,.topbar .spacer{display:none}
+  .topbar .btn{padding:6px 9px;font-size:12px}
+  .workbar{padding:8px 10px;gap:6px}
+  .workbar .hint{display:none}
+  .main{display:block;min-height:0}
+  .rail{flex:0 0 auto;flex-direction:row;overflow-x:auto;gap:2px;padding:4px 6px;border-right:0;border-bottom:1px solid var(--line)}
+  .railBtn{flex:0 0 auto;flex-direction:row;gap:4px;padding:7px 9px;font-size:11.5px;white-space:nowrap}
+  .railBtn svg{width:17px;height:17px}
+  .pages{display:block;min-width:0}
+  .pagePanel{padding:10px;overflow:visible}
+  .grid{grid-template-columns:64px minmax(0,1fr);gap:7px 8px}
+  .grid .span3{grid-column:2 / span 1}
+  .card{padding:11px 12px}
+  .card-title{flex-wrap:wrap;gap:5px}
+  .card-title .sub{line-height:1.6}
+}
 
 /* ---------- 打印 ---------- */
 #printRoot{display:none}
