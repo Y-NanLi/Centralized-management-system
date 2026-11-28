@@ -28,7 +28,7 @@ async function pageDocs(q, my) {
     `<option value="${o.id}" ${String(o.id) === owner ? 'selected' : ''}>${esc(o.display_name)}${o.role === 'guest' ? '（游客）' : ''}</option>`).join('') : '';
 
   const typeOrder = { quote: 0, contract: 1, delivery: 2 };
-  const docRow = (x, relation, inChain) => `<tr class="clickable ${inChain ? 'chain-member' : ''}" data-id="${x.id}" title="点击进入编辑 / 预览">
+  const docRow = (x, relation, inChain) => `<tr class="clickable ${inChain ? 'chain-member' : ''}" data-id="${x.id}" title="单击查看详情，双击进入编辑">
       <td><span class="type-tag ${x.type}">${typeLabel(x.type)}</span></td>
       <td class="mono">${esc(x.doc_no)}</td>
       <td>${esc(x.customer_name || '—')}</td>
@@ -88,7 +88,7 @@ async function pageDocs(q, my) {
   const tabHref = (t) => '#/docs?' + new URLSearchParams({ ...(t ? { type: t } : {}), ...(owner ? { owner } : {}) }).toString();
   const title = owner ? `${(state.owners.find((o) => String(o.id) === owner) || {}).display_name || '成员'}的单据` : '单据中心';
   const v = view(`
-    <div class="page-head"><div><h2>${esc(title)}</h2><div class="desc">共 ${data.total} 张 · 编号全系统共用，遇到已占用号自动跳过 · 关联单据会分组显示</div></div>
+    <div class="page-head"><div><h2>${esc(title)}</h2><div class="desc">共 ${data.total} 张 · 编号全系统共用，遇到已占用号自动跳过 · 单击查看，双击编辑</div></div>
       ${owner ? '<div class="tiny">正在查看成员单据，新建请切回“全部成员”</div>' : `<div class="actions"><button class="btn" data-new="quote">+ 报价单</button><button class="btn" data-new="contract">+ 合同</button><button class="btn primary" data-new="delivery">+ 送货单</button></div>`}</div>
     <div class="card">
       <div class="toolbar">
@@ -111,7 +111,19 @@ async function pageDocs(q, my) {
     </div>`, 'docs', '单据中心 / ' + (type ? typeLabel(type) : (owner ? '成员筛选' : '全部')));
 
   v.querySelectorAll('[data-new]').forEach((b) => b.onclick = () => { location.hash = `#/doc/new?type=${b.dataset.new}`; });
-  v.querySelectorAll('tr[data-id]').forEach((tr) => tr.onclick = () => { location.hash = `#/doc/edit?id=${tr.dataset.id}`; });
+  v.querySelectorAll('tr[data-id]').forEach((tr) => {
+    let timer = 0;
+    tr.onclick = (e) => {
+      if (e.detail > 1) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => { location.hash = `#/doc?id=${tr.dataset.id}`; }, 300);
+    };
+    tr.ondblclick = (e) => {
+      e.preventDefault();
+      clearTimeout(timer);
+      location.hash = `#/doc/edit?id=${tr.dataset.id}`;
+    };
+  });
   v.querySelector('#fDoc').onsubmit = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -213,7 +225,7 @@ async function pageDocDetail(q, my) {
   })).join('');
   const graphCards = graphNodes.map((n) => {
     const { x, y } = nodeXY(n);
-    return `<div class="flow-node ${Number(n.id) === Number(d.id) ? 'on' : ''}" style="left:${x}px;top:${y}px;width:${CARD_W}px;height:${CARD_H}px" data-go="${n.id}">
+    return `<div class="flow-node ${Number(n.id) === Number(d.id) ? 'on' : ''}" style="left:${x}px;top:${y}px;width:${CARD_W}px;height:${CARD_H}px" data-go="${n.id}" data-type="${n.type}" title="${n.type === 'quote' || n.type === 'contract' ? '单击查看详情，双击进入编辑' : '单击查看详情'}">
         <div class="flow-main"><b>${typeLabel(n.type)}</b><span class="st">${statusLabel(n.type, n.status)}</span></div>
         <span class="n">${esc(n.doc_no)}</span>
       </div>`;
@@ -299,7 +311,20 @@ async function pageDocDetail(q, my) {
     </div>`, 'docs', typeLabel(d.type) + ' / ' + d.doc_no);
 
   const go = (h) => { location.hash = h; };
-  v.querySelectorAll('[data-go]').forEach((n) => n.onclick = () => go('#/doc?id=' + n.dataset.go));
+  v.querySelectorAll('[data-go]').forEach((n) => {
+    let timer = 0;
+    n.onclick = (e) => {
+      if (e.detail > 1) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => go('#/doc?id=' + n.dataset.go), 300);
+    };
+    n.ondblclick = (e) => {
+      if (!['quote', 'contract'].includes(n.dataset.type)) return;
+      e.preventDefault();
+      clearTimeout(timer);
+      go('#/doc/edit?id=' + n.dataset.go);
+    };
+  });
   if (v.querySelector('#btnEdit')) v.querySelector('#btnEdit').onclick = () => go(`#/doc/edit?id=${d.id}`);
   v.querySelector('#btnPrint').onclick = async () => {
     try {
