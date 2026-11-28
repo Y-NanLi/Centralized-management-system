@@ -1,5 +1,5 @@
 /* 单据列表与详情 */
-import { state, api, esc, fmt, typeLabel, statusLabel, fileUrl, toast, confirmBox, cnyUpper, seq } from '../core.js';
+import { state, api, esc, fmt, typeLabel, statusLabel, fileUrl, toast, confirmBox, cnyUpper, seq, rerender } from '../core.js';
 import { view } from '../shell.js';
 
 /* ---------------- 单据列表 ---------------- */
@@ -7,11 +7,13 @@ async function pageDocs(q, my) {
   const type = q.get('type') || '';
   const status = q.get('status') || '';
   const kw = q.get('q') || '';
+  const owner = state.user.role === 'admin' ? (q.get('owner') || '') : '';
   const page = Number(q.get('page') || 1);
   const params = new URLSearchParams();
   if (type) params.set('type', type);
   if (status) params.set('status', status);
   if (kw) params.set('q', kw);
+  if (owner) params.set('owner', owner);
   params.set('page', page);
   const data = await api('/documents?' + params.toString());
   if (my !== seq) return;
@@ -21,6 +23,9 @@ async function pageDocs(q, my) {
     : Object.values(state.meta.statuses).flat().filter((s, i, arr) => arr.findIndex((x) => x.key === s.key) === i)
       .map((s) => `<option value="${s.key}" ${s.key === status ? 'selected' : ''}>${s.label}</option>`).join('');
 
+  const ownerOpts = state.user.role === 'admin' ? `<option value="">全部成员</option>` + state.owners.map((o) =>
+    `<option value="${o.id}" ${String(o.id) === owner ? 'selected' : ''}>${esc(o.display_name)}${o.role === 'guest' ? '（游客）' : ''}</option>`).join('') : '';
+
   const rows = data.items.map((x) => `<tr class="clickable" data-id="${x.id}" title="点击进入编辑 / 预览">
       <td><span class="type-tag ${x.type}">${typeLabel(x.type)}</span></td>
       <td class="mono">${esc(x.doc_no)}</td>
@@ -29,21 +34,24 @@ async function pageDocs(q, my) {
       <td class="right nowrap">￥${fmt(x.amount)}</td>
       <td><span class="badge ${x.status}">${statusLabel(x.type, x.status)}</span></td>
       <td class="tiny nowrap">${esc(x.doc_date)}</td>
-      <td class="tiny nowrap">${esc(x.owner_name || '')}</td>
+      <td class="tiny nowrap">${esc(x.owner_name || x.owner_username || '')}</td>
     </tr>`).join('');
 
   const pages = Math.max(1, Math.ceil(data.total / data.page_size));
+  const tabHref = (t) => '#/docs?' + new URLSearchParams({ ...(t ? { type: t } : {}), ...(owner ? { owner } : {}) }).toString();
+  const title = owner ? `${(state.owners.find((o) => String(o.id) === owner) || {}).display_name || '成员'}的单据` : '单据中心';
   const v = view(`
-    <div class="page-head"><div><h2>单据中心</h2><div class="desc">共 ${data.total} 张 · 报价 → 合同 → 送货单 可逐级派生，客户与明细自动带过去</div></div>
-      <div class="actions"><button class="btn" data-new="quote">+ 报价单</button><button class="btn" data-new="contract">+ 合同</button><button class="btn primary" data-new="delivery">+ 送货单</button></div></div>
+    <div class="page-head"><div><h2>${esc(title)}</h2><div class="desc">共 ${data.total} 张 · 报价 → 合同 → 送货单 可逐级派生，客户与明细自动带过去</div></div>
+      ${owner ? '<div class="tiny">正在查看成员单据，新建请切回“全部成员”</div>' : `<div class="actions"><button class="btn" data-new="quote">+ 报价单</button><button class="btn" data-new="contract">+ 合同</button><button class="btn primary" data-new="delivery">+ 送货单</button></div>`}</div>
     <div class="card">
       <div class="toolbar">
         <div style="display:flex;gap:4px;background:#f3f6fb;border-radius:9px;padding:3px">
-          ${['', 'quote', 'contract', 'delivery'].map((t) => `<a class="btn ghost ${t === type ? 'primary' : ''}" style="border:0;padding:5px 12px" href="#/docs${t ? '?type=' + t : ''}">${t ? typeLabel(t) : '全部'}</a>`).join('')}
+          ${['', 'quote', 'contract', 'delivery'].map((t) => `<a class="btn ghost ${t === type ? 'primary' : ''}" style="border:0;padding:5px 12px" href="${tabHref(t)}">${t ? typeLabel(t) : '全部'}</a>`).join('')}
         </div>
         <form id="fDoc" style="display:flex;gap:8px;align-items:center">
           <div class="search"><input class="input" name="q" value="${esc(kw)}" placeholder="单号 / 客户 / 标题"></div>
           <select class="input" name="status" style="width:130px"><option value="">全部状态</option>${statusOpts}</select>
+          ${ownerOpts ? `<select class="input" name="owner" style="width:150px">${ownerOpts}</select>` : ''}
           <button class="btn">筛选</button>
         </form>
         <div class="spacer"></div>
@@ -51,9 +59,9 @@ async function pageDocs(q, my) {
         ${page > 1 ? `<a class="btn sm" href="${hashWith(q, { page: page - 1 })}">上一页</a>` : ''}
         ${page < pages ? `<a class="btn sm" href="${hashWith(q, { page: page + 1 })}">下一页</a>` : ''}
       </div>
-      <table class="tb"><thead><tr><th>类型</th><th>编号</th><th>客户</th><th>关联</th><th class="right">金额</th><th>状态</th><th>日期</th><th>制单</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="8"><div class="empty"><b>暂无单据</b>点右上角新建，或从旧系统导入备份</div></td></tr>'}</tbody></table>
-    </div>`, 'docs', '单据中心 / ' + (type ? typeLabel(type) : '全部'));
+      <table class="tb"><thead><tr><th>类型</th><th>编号</th><th>客户</th><th>关联</th><th class="right">金额</th><th>状态</th><th>日期</th><th>制单人</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="8"><div class="empty"><b>暂无单据</b>${owner ? '该成员还没有单据' : '点右上角新建，或从旧系统导入备份'}</div></td></tr>`}</tbody></table>
+    </div>`, 'docs', '单据中心 / ' + (type ? typeLabel(type) : (owner ? '成员筛选' : '全部')));
 
   v.querySelectorAll('[data-new]').forEach((b) => b.onclick = () => { location.hash = `#/doc/new?type=${b.dataset.new}`; });
   v.querySelectorAll('tr[data-id]').forEach((tr) => tr.onclick = () => { location.hash = `#/doc/edit?id=${tr.dataset.id}`; });
@@ -64,6 +72,7 @@ async function pageDocs(q, my) {
     if (type) np.set('type', type);
     if (fd.get('q')) np.set('q', fd.get('q'));
     if (fd.get('status')) np.set('status', fd.get('status'));
+    if (fd.get('owner')) np.set('owner', fd.get('owner'));
     location.hash = '#/docs' + (np.toString() ? '?' + np.toString() : '');
   };
 }
@@ -166,7 +175,7 @@ async function pageDocDetail(q, my) {
   v.querySelector('#selStatus').onchange = async (e) => {
     try {
       await api(`/documents/${d.id}/status`, { method: 'POST', body: { status: e.target.value } });
-      toast('状态已更新'); route();
+      toast('状态已更新'); rerender();
     } catch (err) { toast(err.message, true); }
   };
 
@@ -175,18 +184,18 @@ async function pageDocDetail(q, my) {
   drop.onclick = () => input.click();
   v.querySelectorAll('[data-unlink]').forEach((b) => b.onclick = async () => {
     if (!await confirmBox('从本单据移除该附件？文件仍保留在文件库。')) return;
-    try { await api(`/documents/${d.id}/files/${b.dataset.unlink}`, { method: 'DELETE' }); toast('已移除'); route(); } catch (e) { toast(e.message, true); }
+    try { await api(`/documents/${d.id}/files/${b.dataset.unlink}`, { method: 'DELETE' }); toast('已移除'); rerender(); } catch (e) { toast(e.message, true); }
   });
   input.onchange = async () => {
     if (!input.files.length) return;
     await uploadDocs(d.id, input.files);
-    route();
+    rerender();
   };
   drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('on'); };
   drop.ondragleave = () => drop.classList.remove('on');
   drop.ondrop = async (e) => {
     e.preventDefault(); drop.classList.remove('on');
-    if (e.dataTransfer.files.length) { await uploadDocs(d.id, e.dataTransfer.files); route(); }
+    if (e.dataTransfer.files.length) { await uploadDocs(d.id, e.dataTransfer.files); rerender(); }
   };
 }
 

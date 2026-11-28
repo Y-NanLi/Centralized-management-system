@@ -6,6 +6,7 @@ async function loadBase() {
   state.companies = await api('/companies');
   state.customers = await api('/customers');
   state.products = await api('/products');
+  state.owners = state.user && state.user.role === 'admin' ? await api('/owners') : [];
 }
 
 
@@ -36,7 +37,7 @@ function renderShell() {
       </aside>
       <div class="main">
         <div class="topbar"><div class="crumb" id="crumb">工作台</div><div class="spacer"></div>
-          <div class="tiny" id="topInfo">${isGuest ? '游客模式：数据保存在服务器共享库；登录后本浏览器的游客单据归属到你的账号（只合并一次）' : ''}</div></div>
+          <div class="tiny" id="topInfo">${isGuest ? '游客模式：数据仅属于本浏览器，别处看不到；注册账号可长期保存，登录时会自动并入账号' : (state.user.role === 'admin' ? '管理员：默认查看全部成员工作台，可按成员切换' : '当前只显示你自己的客户、货品、单据和文件')}</div></div>
         <div class="content" id="view"></div>
       </div>
     </div>`;

@@ -1,10 +1,10 @@
 # 集中管理系统（报价 / 合同 / 送货单）
 
-> 当前版本：**v1.6**（2026-11-28）
+> 当前版本：**v1.7**（2026-11-28）
 
 把原来三个「单文件 HTML + 浏览器 localStorage」工具的数据，统一收拢到一台服务器上：
 **一套客户档案、一套货品库、一条报价 → 合同 → 送货单的业务链、一个文件库、一套账号权限**。
-任何一台电脑登录同一个地址，看到的都是同一份数据。
+每个账号只看到自己的工作台、客户、货品、单据和文件；管理员可以查看全部成员，并按成员切换工作台。
 
 - 后端：Node.js 22 + 内置 `node:sqlite`（零第三方依赖，不需要 npm install）
 - 前端：原生 ES Module 单页（无构建步骤，改完刷新即生效）
@@ -29,16 +29,17 @@
 
 ## 二、功能
 
-**游客模式（默认，无需登录）**
-- 打开系统直接进完整管理界面，报价单 / 销售合同 / 送货单、客户档案、货品库、单据列表、文件库都能用，系统内置的公司 Logo 与电子章也能直接加盖
-- 游客身份由持久化 cookie `gid` 标识（一年有效），服务端为它建一个临时 `guest` 账号；单据、客户、货品、文件都写进**同一套服务器数据库**，与登录账号共享，不是浏览器本地草稿
-- 游客数据按 `owner_id` 记为这个游客；登录时把这些单据、文件、客户来源一次性转移到账号，并清掉 `gid` cookie
-- **同一份游客数据只合并一次**：账号一合并后，该游客身份已删除；同一浏览器再登录账号二不会重复合并，数据归属仍是账号一，清 cookie 也不会丢
-- 账号管理、系统设置这类管理员入口仍只在登录后出现
+**免密码账号（默认）**
+- 登录只凭用户名，不校验密码；用户名支持中文、字母、数字、下划线、点或短横，2–24 位
+- 任何人可在登录页自助注册，默认业务员角色；管理员账号仍叫 `admin`，同样免密码登录
+- 每个普通账号只能看到自己的客户、货品、单据、文件和统计；前端与后端双层按 `owner_id/created_by` 隔离
+- 管理员默认看到全部成员的数据，可通过工作台、单据、客户、货品、文件页的成员下拉切换；管理员可查看、编辑、打印、改状态、删除、转换任意成员的单据
+- 管理员在“查看某个成员”时不提供新建入口，避免把新单建到自己名下；切回“全部成员”即可新建
 
-**账号与权限**
-- 登录、改密、启停账号；管理员 / 主管 / 业务员三种角色
-- 业务员可开单、改单；主管可删除、导入；管理员另可管账号与公司主体
+**游客模式（兼容入口）**
+- 登录页仍保留“先不登录，用临时游客模式”；游客身份由持久化 cookie `gid` 标识，服务端为它建一个临时 `guest` 账号
+- 游客数据只属于该浏览器对应的游客身份，其他账号看不到；注册/登录时自动合并到账号，合并后删除游客身份
+- 游客只能操作自己的数据，不能进入用户管理
 
 **客户档案**
 - 新增 / 编辑 / 搜索；名称、联系人、电话、传真、地址、税号、备注
@@ -82,7 +83,7 @@
    node server.js
    ```
 3. 浏览器打开 http://localhost:8099
-4. 默认管理员 **admin / admin123**，登录后到「系统设置 → 修改我的密码」
+4. 默认管理员用户名 **admin**，免密码登录；普通用户可在登录页自助注册中文用户名
 
 数据目录默认是项目下的 `data/`（可用环境变量 `DATA_DIR` 指定）：
 
@@ -161,47 +162,49 @@ Compress-Archive -Path .\data -DestinationPath "D:\backup\jizhong-$(Get-Date -Fo
 
 | 操作 | 管理员 | 主管 | 业务员 | 游客 |
 |---|---|---|---|---|
-| 查看 / 新建 / 编辑单据 | ✓ | ✓ | ✓ | ✓ |
-| 删除单据 | ✓ | ✓ | ✗ | ✓ |
-| 客户、货品增改 | ✓ | ✓ | ✓ | ✓ |
-| 删除客户 / 货品 | ✓ | ✓ | ✗ | ✗ |
-| 文件上传 / 查看 | ✓ | ✓ | ✓ | ✓ |
-| 删除文件 | ✓ | ✓ | ✗ | ✓ |
-| 导入旧数据 | ✓ | ✓ | ✗ | ✗ |
+| 数据可见范围 | 全部成员，可按成员切换 | 仅本人 | 仅本人 | 仅本游客身份 |
+| 查看 / 新建 / 编辑单据 | ✓（可跨成员） | ✓（仅本人） | ✓（仅本人） | ✓（仅本人） |
+| 删除单据 | ✓ | ✓（仅本人） | ✗ | ✓（仅本人） |
+| 客户、货品增改 | ✓（可跨成员） | ✓（仅本人） | ✓（仅本人） | ✓（仅本人） |
+| 删除客户 / 货品 | ✓ | ✓（仅本人） | ✗ | ✗ |
+| 文件上传 / 查看 | ✓（可跨成员） | ✓（仅本人） | ✓（仅本人） | ✓（仅本人） |
+| 删除文件 | ✓ | ✓（仅本人） | ✗ | ✓（仅本人） |
+| 导入旧数据 | ✓（归本人） | ✓（归本人） | ✗ | ✗ |
 | 修改公司主体 / Logo / 电子章 | ✓ | ✓ | ✗ | ✗ |
-| 用户管理 | ✓ | ✗ | ✗ | ✗ |
+| 用户管理 / 查看成员列表 | ✓ | ✗ | ✗ | ✗ |
 
-游客与登录账号共用一套客户、货品、单据、文件；区别只是身份和合并归属。
+普通账号之间的客户、货品、单据、文件互不可见；公司 Logo / 电子章属于公司共用资源，所有登录账号都可读取。管理员通过 `?owner=<用户id>` 查看指定成员，不带该参数时看全部成员。
 
 ---
 
 ## 八、主要接口
 
-所有接口以 `/api` 开头。除登录、`/api/auth/guest`、`/api/public/bootstrap` 外，都需要身份：登录用户用 `Authorization: Bearer <token>`，游客用持久化 cookie `gid`（也可用 `?token=` 传登录 token）。
+所有接口以 `/api` 开头。除登录、注册、`/api/auth/guest`、`/api/public/bootstrap` 外，都需要身份：登录用户用 `Authorization: Bearer <token>`，游客用持久化 cookie `gid`（也可用 `?token=` 传登录 token）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/api/auth/login` | 登录；若带游客 cookie，合并游客单据/文件/客户来源（仅一次） |
-| GET | `/api/auth/guest` | 免登录游客：发/复用持久化 cookie `gid`，返回临时游客身份 |
+| POST | `/api/auth/login` | `{username}` 免密码登录；若带游客 cookie，合并该游客数据 |
+| POST | `/api/auth/register` | `{username,name,phone}` 公开注册，默认业务员，注册后直接登录并合并游客数据 |
+| GET | `/api/auth/guest` | 临时游客：发/复用持久化 cookie `gid`，返回临时游客身份 |
 | GET | `/api/auth/me` | 当前用户 |
-| PUT | `/api/auth/password` | 改密 |
-| GET/POST/PUT/DELETE | `/api/users` | 用户管理（管理员） |
+| GET/POST/PUT/DELETE | `/api/users` | 用户管理（管理员）；新增/编辑不再需要密码 |
+| GET | `/api/owners` | 管理员成员列表（含已有数据的游客），用于工作台/单据筛选 |
 | GET | `/api/companies` | 公司主体 |
 | PUT | `/api/companies/:id` | 修改主体（主管以上） |
 | POST | `/api/companies/:id/logo\|stamp` | 上传 Logo / 电子章 |
-| GET/POST/PUT/DELETE | `/api/customers` | 客户档案 |
-| GET/POST/PUT/DELETE | `/api/products` | 货品库 |
-| GET | `/api/documents` | 单据列表（type/status/q/日期/分页） |
-| POST/PUT/DELETE | `/api/documents` | 新建 / 修改 / 删除 |
-| POST | `/api/documents/:id/convert` | `{ "to": "contract" \| "delivery" }` 派生下游单据 |
+| GET/POST/PUT/DELETE | `/api/customers` | 客户档案；按 `created_by` 隔离，管理员可加 `?owner=` |
+| GET/POST/PUT/DELETE | `/api/products` | 货品库；按 `owner_id` 隔离，管理员可加 `?owner=` |
+| GET | `/api/documents` | 单据列表（type/status/q/日期/分页；管理员可加 `owner`） |
+| POST/PUT/DELETE | `/api/documents` | 新建 / 修改 / 删除；普通用户只能操作本人单据 |
+| POST | `/api/documents/:id/convert` | `{ "to": "contract" \| "delivery" }` 派生下游单据，归属保持原单据 owner |
 | POST | `/api/documents/:id/status` | 状态流转 |
 | GET | `/api/documents/:id/chain` | 关联链路 |
-| POST | `/api/documents/:id/files` | 上传附件（multipart） |
-| POST | `/api/files` | 上传到文件库 |
-| GET | `/api/files/:id/raw\|download` | 查看 / 下载 |
-| GET | `/api/dashboard` | 工作台统计 |
-| GET | `/api/export/backup` | 导出结构化数据 JSON（主管以上） |
-| POST | `/api/import/legacy` | 导入旧工具备份 JSON |
+| POST | `/api/documents/:id/files` | 上传附件（multipart），文件归属单据 owner |
+| POST | `/api/files` | 上传到本人文件库 |
+| GET | `/api/files/:id/raw\|download` | 查看 / 下载；公司 Logo/电子章全公司可读 |
+| GET | `/api/dashboard` | 工作台统计；普通用户只统计本人，管理员可加 `?owner=` |
+| GET | `/api/export/backup` | 导出结构化数据 JSON（主管以上；按本人或 `owner` 过滤） |
+| POST | `/api/import/legacy` | 导入旧工具备份 JSON，数据归当前账号 |
 
 ---
 
@@ -224,11 +227,7 @@ Compress-Archive -Path .\data -DestinationPath "D:\backup\jizhong-$(Get-Date -Fo
 
 **打不开页面**：确认 `node server.js` 窗口还在、8099 端口未被占用（`netstat -ano | findstr 8099`）。
 
-**忘记管理员密码**：停服后执行
-```powershell
-node tools/reset-password.js admin 你的新密码
-```
-（至少 6 位；会同时把该账号恢复为启用状态。不要删 `app.db`，那会把所有数据一起删掉。）
+**管理员账号登不进**：确认用户名是 `admin`（登录不校验密码）；若被停用，停服后用 SQLite 把 `users` 中 admin 的 `active` 改回 1。不要删 `app.db`，那会把所有数据一起删掉。
 
 **打印出来有空白第二页**：打印面板里纸张选 A4、缩放 100%、边距「无」、关闭页眉页脚。
 
@@ -240,6 +239,7 @@ node tools/reset-password.js admin 你的新密码
 
 | 版本 | 日期 | 内容 |
 |---|---|---|
+| v1.7 | 2026-11-28 | 多用户工作台隔离：普通账号只看自己的客户、货品、单据、文件与统计；管理员看全部成员，并可在工作台/单据/客户/货品/文件页按成员切换。改为免密码登录（只凭用户名），开放自助注册，用户名支持中文；新增 `/api/auth/register`、`/api/owners`；客户唯一约束改为 `(created_by,name)`、货品改为 `(owner_id,name,spec)`；管理员跨成员编辑/打印/状态/删除/转换，代转单据保持原 owner；公司 Logo/电子章全公司可读；游客入口保留并仍可合并到账号 |
 | v1.6 | 2026-11-28 | 单据新建/编辑直接调用三套独立生成器网页（`web/templates/quote.html`、`contract.html`、`delivery.html`），不再由 `print.js` 重绘版式；新增 `template-bridge.js` 与 `template-editor.js`：父页面把集中系统单据/客户/货品/公司数据注入模板 localStorage，模板保存或打印时由 bridge 回写 `/api/documents`，并支持返回系统、禁止模板内“新建”误覆盖当前单据；送货单强制 A4、报价公司键 `anch` 对应集中系统 `ac` |
 | v1.5 | 2026-11-28 | 三套单据版式接入用户已调试模板：报价单（58mm Logo / 5 行信息表 / 6 列明细 / 条款与可选签章）、销售合同（5 列明细 / 总计大写 / 备注 / 条款 / 双方签章）、送货单（A4 绝对定位 9 列明细 / 三行信息 / 绿色表头 / 每 12 行分页并带小计或合计与页码 / 签字栏）；编辑器补齐报价传真与「关于」、含税/未税、送货制单人/经办人/部门/仓库/送货人/摘要及明细存货编号、合同编号字段 |
 | v1.4 | 2026-11-28 | 单据新建/编辑改为左右分栏工作台：左侧表单、右侧 A4 实时预览；支持供货方资料、主体切换、缩放/适应、Logo 与电子章开关、直接打印/导出 PDF，三套版式共用同一预览引擎 |

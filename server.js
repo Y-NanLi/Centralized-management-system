@@ -21,7 +21,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`\n  集中管理系统已启动：http://localhost:${PORT}\n  默认管理员：admin / admin123（请登录后立即修改密码）\n`);
+  console.log(`\n  集中管理系统已启动：http://localhost:${PORT}\n  管理员用户名：admin（免密码登录；普通用户可在登录页注册中文用户名）\n`);
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) {

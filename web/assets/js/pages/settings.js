@@ -1,32 +1,33 @@
 /* 系统设置 */
-import { state, api, esc, today, roleLabel, fileUrl, toast, modal, cnyUpper, seq } from '../core.js';
+import { state, api, esc, today, roleLabel, fileUrl, toast, cnyUpper, seq, rerender } from '../core.js';
 import { view } from '../shell.js';
 
 /* ---------------- 设置 ---------------- */
 async function pageSettings(q, my) {
-  const v = view(`<div class="page-head"><div><h2>系统设置</h2><div class="desc">公司主体与电子章、账号密码、旧数据导入</div></div></div>
+  const v = view(`<div class="page-head"><div><h2>系统设置</h2><div class="desc">公司主体与电子章、账号说明、旧数据导入</div></div></div>
     <div class="card"><h3>公司主体</h3><div class="card-sub">报价单、合同、送货单可分别选择主体；编号前缀取主体代码</div>
       <div id="coBox" class="grid3"></div></div>
 
     <div class="card" style="margin-top:14px"><h3>从旧工具导入数据</h3>
-      <div class="card-sub">支持三个单文件工具「导出全部 / 导出备份」的 JSON：报价单（ac-quote-all）、合同（sale-contract）、送货单（records + products）。客户、货品、单据会去重导入，已有的不覆盖。</div>
+      <div class="card-sub">支持三个单文件工具「导出全部 / 导出备份」的 JSON：报价单（ac-quote-all）、合同（sale-contract）、送货单（records + products）。导入的客户、货品、单据归当前登录账号。</div>
       <div class="drop" id="impBox">点击选择备份 JSON 文件</div>
       <input type="file" id="impInput" accept=".json,application/json" hidden>
       <div id="impResult" class="tiny" style="margin-top:10px"></div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>账号</h3>
-      <div class="kv"><div><div class="k">当前账号</div><div class="v">${esc(state.user.username)}（${esc(roleLabel(state.user.role))}）</div></div></div>
-      <button class="btn" id="btnPwd" style="margin-top:12px">修改我的密码</button>
+      <div class="kv"><div><div class="k">当前账号</div><div class="v">${esc(state.user.name || state.user.username)}（${esc(state.user.username)} · ${esc(roleLabel(state.user.role))}）</div></div></div>
+      <div class="tiny" style="margin-top:10px;line-height:1.9">系统已改为免密码登录，凭用户名识别身份。用户名支持中文、字母、数字、下划线、点或短横；新用户可在登录页自助注册。<br>
+      普通账号只能看到自己的工作台、客户、货品、单据和文件；管理员可查看全部成员，并在工作台按成员切换。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
-      <div class="card-sub">导出客户、货品、单据与公司主体为 JSON；上传的文件实体在服务器 data/files 目录，请一并复制备份。</div>
+      <div class="card-sub">导出客户、货品、单据与公司主体为 JSON；普通账号只导出本人数据，管理员默认导出全部成员。上传的文件实体在服务器 data/files 目录，请一并复制备份。</div>
       <button class="btn" id="btnExportData">导出数据 JSON</button>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">集中管理系统 v1.6 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">集中管理系统 v1.7 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 
@@ -59,7 +60,7 @@ async function pageSettings(q, my) {
     const id = Number(b.dataset.save);
     const body = {};
     coBox.querySelectorAll(`[data-co="${id}"]`).forEach((inp) => { body[inp.dataset.k] = inp.value; });
-    try { await api('/companies/' + id, { method: 'PUT', body }); state.companies = await api('/companies'); toast('已保存'); route(); } catch (e) { toast(e.message, true); }
+    try { await api('/companies/' + id, { method: 'PUT', body }); state.companies = await api('/companies'); toast('已保存'); rerender(); } catch (e) { toast(e.message, true); }
   });
   coBox.querySelectorAll('[data-up]').forEach((b) => b.onclick = () => {
     const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
@@ -67,7 +68,7 @@ async function pageSettings(q, my) {
     input.onchange = async () => {
       if (!input.files[0]) return;
       const fd = new FormData(); fd.append('file', input.files[0]);
-      try { await api(`/companies/${b.dataset.up}/${b.dataset.kind}`, { method: 'POST', body: fd }); state.companies = await api('/companies'); toast('已上传'); route(); } catch (e) { toast(e.message, true); }
+      try { await api(`/companies/${b.dataset.up}/${b.dataset.kind}`, { method: 'POST', body: fd }); state.companies = await api('/companies'); toast('已上传'); rerender(); } catch (e) { toast(e.message, true); }
       input.remove();
     };
     input.click();
@@ -89,7 +90,6 @@ async function pageSettings(q, my) {
     } catch (e) { box.textContent = ''; toast(e.message, true); }
   };
 
-  v.querySelector('#btnPwd').onclick = () => passwordForm();
   v.querySelector('#btnExportData').onclick = async () => {
     try {
       const data = await api('/export/backup');
@@ -103,21 +103,5 @@ async function pageSettings(q, my) {
     } catch (e) { toast(e.message, true); }
   };
 }
-
-function passwordForm() {
-  const m = modal({
-    title: '修改密码',
-    body: `<div class="field"><label>原密码</label><input class="input" type="password" id="pwOld"></div>
-      <div class="field"><label>新密码（至少 6 位）</label><input class="input" type="password" id="pwNew"></div>`,
-    footer: '<button class="btn" data-close>取消</button><button class="btn primary" id="pwSave">保存</button>',
-  });
-  m.root.querySelector('#pwSave').onclick = async () => {
-    try {
-      await api('/auth/password', { method: 'PUT', body: { old_password: m.root.querySelector('#pwOld').value, password: m.root.querySelector('#pwNew').value } });
-      m.close(); toast('密码已修改');
-    } catch (e) { toast(e.message, true); }
-  };
-}
-
 
 export { pageSettings };

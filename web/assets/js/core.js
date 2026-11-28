@@ -8,6 +8,8 @@ const state = {
   products: [],
   onUnauthorized: null,
   onLogout: null,
+  onRerender: null,
+  owners: [],
 };
 
 const app = document.getElementById('app');
@@ -45,7 +47,7 @@ async function api(path, opts = {}) {
   }
   const j = await res.json();
   if (!j.ok) {
-    if (res.status === 401 && !['/auth/me', '/auth/login', '/auth/guest'].includes(path) && state.onUnauthorized) state.onUnauthorized();
+    if (res.status === 401 && !['/auth/me', '/auth/login', '/auth/register', '/auth/guest'].includes(path) && state.onUnauthorized) state.onUnauthorized();
     throw new Error(j.error || '请求失败');
   }
   return j.data;
@@ -122,4 +124,9 @@ function parseHash() {
   return { path, q: new URLSearchParams(qs || '') };
 }
 
-export { state, app, esc, fmt, qtyFmt, today, typeLabel, statusLabel, roleLabel, fileUrl, api, toast, modal, confirmBox, cnyUpper, parseHash };
+function rerender() {
+  if (state.onRerender) state.onRerender();
+  else location.reload();
+}
+
+export { state, app, esc, fmt, qtyFmt, today, typeLabel, statusLabel, roleLabel, fileUrl, api, toast, modal, confirmBox, cnyUpper, parseHash, rerender };

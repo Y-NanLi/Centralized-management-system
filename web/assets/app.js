@@ -26,51 +26,63 @@ const routes = {
   '/settings': pageSettings,
 };
 
-function logout() {
+function logout(msg) {
   localStorage.removeItem('token');
   state.token = '';
   state.user = null;
-  history.replaceState(null, '', '#/dashboard');
-  startGuest();
+  state.owners = [];
+  history.replaceState(null, '', '#/login');
+  renderLogin(msg);
 }
 
-/* ---------------- 登录 ---------------- */
-function renderLogin(msg) {
+/* ---------------- 登录 / 注册 ---------------- */
+function renderLogin(msg, mode = 'login') {
   document.body.classList.remove('printing');
+  const reg = mode === 'register';
   app.innerHTML = `<div class="login-wrap"><form class="login-card" id="loginForm">
       <div class="login-brand"><div class="login-logo">集</div><div><h1>集中管理系统</h1></div></div>
       <div class="sub">报价单 · 销售合同 · 送货单 一体化管理</div>
       ${msg ? `<div class="login-err">${esc(msg)}</div>` : ''}
-      <div class="field"><label>账号</label><input class="input" name="username" autocomplete="username" placeholder="请输入账号" autofocus></div>
-      <div class="field"><label>密码</label><input class="input" type="password" name="password" autocomplete="current-password" placeholder="请输入密码"></div>
-      <button class="btn primary" style="width:100%;justify-content:center;padding:10px" type="submit">登 录</button>
-      <div class="login-note">首次使用：管理员 admin / admin123，登录后请到「系统设置」修改密码。<br>
-      当前浏览器的游客单据会归属到登录账号；同一份游客数据只会合并一次，之后换账号登录不会再合并。</div>
-      <div style="text-align:center;margin-top:14px"><a href="#/" id="toGuest" style="font-size:12.5px;color:#6b7688">← 不登录，继续用游客模式</a></div>
+      <div class="field"><label>用户名</label><input class="input" name="username" autocomplete="username" placeholder="支持中文，2–24 位" autofocus></div>
+      ${reg ? `<div class="field"><label>显示名称</label><input class="input" name="name" placeholder="留空则与用户名相同"></div>
+      <div class="field"><label>电话（可选）</label><input class="input" name="phone" placeholder="联系电话"></div>` : ''}
+      <button class="btn primary" style="width:100%;justify-content:center;padding:10px" type="submit">${reg ? '注 册 并 登 录' : '登 录'}</button>
+      <div class="login-note">登录不需要密码，凭用户名识别身份。用户名支持中文、字母、数字、下划线、点或短横。<br>
+      每个人只能看到自己的工作台和单据；管理员登录后可查看全部成员，并按成员切换工作台。</div>
+      <div class="login-switch">
+        ${reg ? '已有用户名？<a href="#/login" id="toLogin">直接登录</a>' : '还没有用户名？<a href="#/login?mode=register" id="toRegister">注册一个</a>'}
+      </div>
+      <div style="text-align:center;margin-top:10px"><a href="#/" id="toGuest" style="font-size:12.5px;color:#6b7688">先不登录，用临时游客模式</a></div>
     </form></div>`;
   const form = document.getElementById('loginForm');
   form.onsubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
+    const path = reg ? '/auth/register' : '/auth/login';
+    const body = { username: fd.get('username') };
+    if (reg) { body.name = fd.get('name'); body.phone = fd.get('phone'); }
     try {
-      const r = await api('/auth/login', { method: 'POST', body: { username: fd.get('username'), password: fd.get('password') } });
+      const r = await api(path, { method: 'POST', body });
       state.token = r.token;
       state.user = r.user;
       localStorage.setItem('token', r.token);
       await loadBase();
-      if (!location.hash || location.hash === '#/login') location.hash = '#/dashboard';
+      history.replaceState(null, '', '#/dashboard');
       renderShell();
       route();
-      const m = r.merged;
-      if (m && (m.documents || m.files || m.customers)) {
-        toast(`登录成功，已合并游客数据：${m.documents} 张单据、${m.files} 个文件、${m.customers} 个客户`);
-      } else {
-        toast('登录成功');
-      }
+      const m = r.merged || {};
+      const total = (m.documents || 0) + (m.files || 0) + (m.customers || 0) + (m.products || 0);
+      if (total) toast(`登录成功，已把本浏览器的临时数据并入账号：${m.documents || 0} 张单据、${m.files || 0} 个文件、${m.customers || 0} 个客户、${m.products || 0} 条货品`);
+      else toast(reg ? '注册成功' : '登录成功');
     } catch (err) {
-      renderLogin(err.message);
+      renderLogin(err.message, mode);
     }
   };
+  const toRegister = document.getElementById('toRegister');
+  if (toRegister) toRegister.onclick = (e) => { e.preventDefault(); renderLogin('', 'register'); };
+  const toLogin = document.getElementById('toLogin');
+  if (toLogin) toLogin.onclick = (e) => { e.preventDefault(); renderLogin(); };
+  document.getElementById('toGuest').onclick = (e) => { e.preventDefault(); startGuest(); };
   form.username && form.username.focus();
 }
 
@@ -80,10 +92,12 @@ async function startGuest() {
     const r = await api('/auth/guest');
     state.token = '';
     state.user = r.user;
+    localStorage.removeItem('token');
     await loadBase();
     renderShell();
-    if (!location.hash) history.replaceState(null, '', '#/dashboard');
+    history.replaceState(null, '', '#/dashboard');
     route();
+    toast('临时游客模式：数据只保存在本浏览器对应的游客身份，建议注册账号长期保存');
   } catch (err) {
     app.innerHTML = `<div class="login-wrap"><div class="login-card">
       <div class="login-brand"><div class="login-logo">集</div><div><h1>集中管理系统</h1></div></div>
@@ -97,7 +111,11 @@ async function startGuest() {
 async function route() {
   if (!state.user) return;
   const r = parseHash();
-  if (r.path === '/login' && state.user.role === 'guest') { renderLogin(); return; }
+  if (r.path === '/login') {
+    if (state.user.role === 'guest') { renderLogin(); return; }
+    location.hash = '#/dashboard';
+    return;
+  }
   if (!document.getElementById('view')) renderShell();
   const my = nextSeq();
   try {
@@ -111,25 +129,27 @@ async function route() {
 
 window.addEventListener('hashchange', () => {
   if (state.user) route();
+  else if (parseHash().path === '/login') renderLogin();
 });
 
-state.onUnauthorized = logout;
-state.onLogout = logout;
+state.onUnauthorized = () => logout('登录已失效，请重新登录');
+state.onLogout = () => logout('已退出登录');
+state.onRerender = route;
 
 /* ---------------- 启动 ---------------- */
 async function boot() {
-  if (!state.token) { startGuest(); return; }
+  if (!state.token) { renderLogin(); return; }
   try {
     const r = await api('/auth/me');
     state.user = r.user;
     await loadBase();
     renderShell();
-    if (!location.hash) history.replaceState(null, '', '#/dashboard');
+    if (!location.hash || location.hash === '#/login') history.replaceState(null, '', '#/dashboard');
     route();
   } catch {
     state.token = '';
     localStorage.removeItem('token');
-    startGuest();
+    renderLogin();
   }
 }
 

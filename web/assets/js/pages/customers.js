@@ -1,32 +1,43 @@
 /* 客户档案 */
-import { api, esc, fmt, typeLabel, statusLabel, toast, modal, seq } from '../core.js';
+import { state, api, esc, fmt, typeLabel, statusLabel, toast, modal, seq, rerender } from '../core.js';
 import { view } from '../shell.js';
 
 /* ---------------- 客户 ---------------- */
 async function pageCustomers(q, my) {
   const kw = q.get('q') || '';
-  const list = await api('/customers' + (kw ? '?q=' + encodeURIComponent(kw) : ''));
+  const owner = state.user.role === 'admin' ? (q.get('owner') || '') : '';
+  const params = new URLSearchParams();
+  if (kw) params.set('q', kw);
+  if (owner) params.set('owner', owner);
+  const list = await api('/customers' + (params.toString() ? '?' + params.toString() : ''));
   if (my !== seq) return;
+  const showOwner = state.user.role === 'admin' && !owner;
   const rows = list.map((c) => `<tr class="clickable" data-id="${c.id}">
       <td><b>${esc(c.name)}</b><div class="tiny">${esc(c.addr || '')}</div></td>
       <td>${esc(c.contact || '—')}</td><td class="mono">${esc(c.phone || '—')}</td>
+      ${showOwner ? `<td class="tiny">${esc(c.owner_name || c.owner_username || '—')}</td>` : ''}
       <td class="right">${c.doc_count}</td><td class="right">￥${fmt(c.total_amount)}</td>
       <td class="tiny">${esc(c.last_date || '—')}</td>
-      <td class="tiny"><a href="#/customer?id=${c.id}" onclick="event.stopPropagation()">详情</a></td>
+      <td class="tiny"><a href="#/customer?id=${c.id}${owner ? '&owner=' + owner : ''}" onclick="event.stopPropagation()">详情</a></td>
     </tr>`).join('');
-  const v = view(`<div class="page-head"><div><h2>客户档案</h2><div class="desc">共 ${list.length} 家 · 三套单据共用同一份客户资料，保存单据时自动建档</div></div>
-      <div class="actions"><button class="btn primary" id="btnAddCust">+ 新增客户</button></div></div>
-    <div class="card"><div class="toolbar"><form id="fCust" style="display:flex;gap:8px"><div class="search"><input class="input" name="q" value="${esc(kw)}" placeholder="名称 / 联系人 / 电话 / 地址"></div><button class="btn">搜索</button></form></div>
-      <table class="tb"><thead><tr><th>客户名称</th><th>联系人</th><th>电话</th><th class="right">单据数</th><th class="right">累计金额</th><th>最近单据</th><th></th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="7"><div class="empty"><b>还没有客户</b>新建单据时填客户名会自动建档</div></td></tr>'}</tbody></table></div>`, 'customers', '客户档案');
+  const ownerOpts = state.user.role === 'admin' ? `<select class="input" name="owner" style="width:150px"><option value="">全部成员</option>${state.owners.map((o) => `<option value="${o.id}" ${String(o.id) === owner ? 'selected' : ''}>${esc(o.display_name)}${o.role === 'guest' ? '（游客）' : ''}</option>`).join('')}</select>` : '';
+  const v = view(`<div class="page-head"><div><h2>${owner ? '成员客户档案' : '客户档案'}</h2><div class="desc">共 ${list.length} 家 · ${owner ? '管理员查看指定成员的客户' : '每个账号只看自己的客户；开单时填客户名会自动建档'}</div></div>
+      ${owner ? '<div class="tiny">正在查看成员客户，新增客户请切回“全部成员”</div>' : '<div class="actions"><button class="btn primary" id="btnAddCust">+ 新增客户</button></div>'}</div>
+    <div class="card"><div class="toolbar"><form id="fCust" style="display:flex;gap:8px"><div class="search"><input class="input" name="q" value="${esc(kw)}" placeholder="名称 / 联系人 / 电话 / 地址"></div>${ownerOpts}<button class="btn">搜索</button></form></div>
+      <table class="tb"><thead><tr><th>客户名称</th><th>联系人</th><th>电话</th>${showOwner ? '<th>归属人</th>' : ''}<th class="right">单据数</th><th class="right">累计金额</th><th>最近单据</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="${showOwner ? 8 : 7}"><div class="empty"><b>还没有客户</b>新建单据时填客户名会自动建档</div></td></tr>`}</tbody></table></div>`, 'customers', '客户档案');
 
-  v.querySelectorAll('tr[data-id]').forEach((tr) => tr.onclick = () => { location.hash = '#/customer?id=' + tr.dataset.id; });
+  v.querySelectorAll('tr[data-id]').forEach((tr) => tr.onclick = () => { location.hash = '#/customer?id=' + tr.dataset.id + (owner ? '&owner=' + owner : ''); });
   v.querySelector('#fCust').onsubmit = (e) => {
     e.preventDefault();
-    const kwv = new FormData(e.target).get('q');
-    location.hash = '#/customers' + (kwv ? '?q=' + encodeURIComponent(kwv) : '');
+    const fd = new FormData(e.target);
+    const np = new URLSearchParams();
+    if (fd.get('q')) np.set('q', fd.get('q'));
+    if (fd.get('owner')) np.set('owner', fd.get('owner'));
+    location.hash = '#/customers' + (np.toString() ? '?' + np.toString() : '');
   };
-  v.querySelector('#btnAddCust').onclick = () => customerForm();
+  const add = v.querySelector('#btnAddCust');
+  if (add) add.onclick = () => customerForm();
 }
 
 function customerForm(c, onSaved) {
@@ -55,7 +66,7 @@ function customerForm(c, onSaved) {
       else await api('/customers', { method: 'POST', body });
       state.customers = await api('/customers');
       m.close(); toast('已保存');
-      if (onSaved) onSaved(); else route();
+      if (onSaved) onSaved(); else rerender();
     } catch (e) { toast(e.message, true); }
   };
 }
@@ -63,13 +74,17 @@ function customerForm(c, onSaved) {
 async function pageCustomer(q, my) {
   const d = await api('/customers/' + q.get('id'));
   if (my !== seq) return;
+  const owner = state.user.role === 'admin' ? (q.get('owner') || '') : '';
   const rows = d.documents.map((x) => `<tr class="clickable" data-id="${x.id}">
       <td><span class="type-tag ${x.type}">${typeLabel(x.type)}</span></td><td class="mono">${esc(x.doc_no)}</td>
       <td>${esc(x.title)}</td><td class="right">￥${fmt(x.amount)}</td>
       <td><span class="badge ${x.status}">${statusLabel(x.type, x.status)}</span></td><td class="tiny">${esc(x.doc_date)}</td></tr>`).join('');
+  const actions = owner
+    ? '<button class="btn" id="btnEditCust">编辑资料</button><div class="tiny">查看成员客户时不提供新建单据入口</div>'
+    : `<div class="actions"><button class="btn" id="btnEditCust">编辑资料</button><button class="btn primary" data-new="quote">给该客户报价</button>
+      <button class="btn" data-new="contract">新建合同</button></div>`;
   const v = view(`<div class="page-head"><div><h2>${esc(d.name)}</h2><div class="desc">${esc([d.addr, d.contact, d.phone].filter(Boolean).join(' · '))}</div></div>
-      <div class="actions"><button class="btn" id="btnEditCust">编辑资料</button><button class="btn primary" data-new="quote">给该客户报价</button>
-      <button class="btn" data-new="contract">新建合同</button></div></div>
+      ${actions}</div>
     <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
       <div class="stat"><div class="k">单据总数</div><div class="v">${d.stats.documents}</div><div class="bar"></div></div>
       <div class="stat"><div class="k">合同金额</div><div class="v">￥${fmt(d.stats.contract_amount)}</div><div class="bar"></div></div>
@@ -80,7 +95,7 @@ async function pageCustomer(q, my) {
       <table class="tb"><thead><tr><th>类型</th><th>编号</th><th>标题</th><th class="right">金额</th><th>状态</th><th>日期</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="6"><div class="empty">还没有单据</div></td></tr>'}</tbody></table></div>`, 'customers', '客户档案 / ' + d.name);
   v.querySelectorAll('tr[data-id]').forEach((tr) => tr.onclick = () => { location.hash = '#/doc?id=' + tr.dataset.id; });
-  v.querySelector('#btnEditCust').onclick = () => customerForm(d, () => route());
+  v.querySelector('#btnEditCust').onclick = () => customerForm(d, () => rerender());
   v.querySelectorAll('[data-new]').forEach((b) => b.onclick = () => { location.hash = `#/doc/new?type=${b.dataset.new}`; });
 }
 

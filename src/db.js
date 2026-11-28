@@ -50,8 +50,6 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
-
 CREATE TABLE IF NOT EXISTS products (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -59,10 +57,10 @@ CREATE TABLE IF NOT EXISTS products (
   unit TEXT DEFAULT '',
   price REAL DEFAULT 0,
   note TEXT DEFAULT '',
+  owner_id INTEGER,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_products_name_spec ON products(name, spec);
 
 CREATE TABLE IF NOT EXISTS documents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +84,7 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_no ON documents(doc_no);
 CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(type, status);
 CREATE INDEX IF NOT EXISTS idx_documents_customer ON documents(customer_id);
+CREATE INDEX IF NOT EXISTS idx_documents_owner ON documents(owner_id);
 
 CREATE TABLE IF NOT EXISTS files (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,6 +97,7 @@ CREATE TABLE IF NOT EXISTS files (
   owner_id INTEGER,
   created_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_files_owner ON files(owner_id);
 
 CREATE TABLE IF NOT EXISTS document_files (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,6 +139,41 @@ if (db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0) {
   db.prepare('INSERT INTO users (username,name,password,role,phone,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)')
     .run('admin', '系统管理员', hashPassword('admin123'), 'admin', '', 1, nowISO(), nowISO());
 }
+
+/* ---------- v1.7 多用户隔离迁移 ---------- */
+const productCols = db.prepare('PRAGMA table_info(products)').all();
+if (!productCols.some((c) => c.name === 'owner_id')) {
+  db.exec('ALTER TABLE products ADD COLUMN owner_id INTEGER');
+}
+const fallbackOwner = db.prepare("SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1").get();
+
+/* 旧货品没有 owner_id：优先按历史单据明细认领给单据 owner，剩下才回填管理员 */
+for (const p of db.prepare('SELECT id,name,spec FROM products WHERE owner_id IS NULL').all()) {
+  let ownerId = 0;
+  const docs = db.prepare('SELECT owner_id,payload FROM documents WHERE owner_id IS NOT NULL AND payload LIKE ? ORDER BY id DESC LIMIT 30').all(`%${p.name}%`);
+  for (const d of docs) {
+    let items = [];
+    try { items = (JSON.parse(d.payload || '{}').items) || []; } catch { items = []; }
+    if (items.some((it) => String(it.name || '').trim() === String(p.name || '').trim()
+      && (!p.spec || String(it.spec || '').trim() === String(p.spec || '').trim()))) {
+      ownerId = d.owner_id;
+      break;
+    }
+  }
+  if (ownerId) db.prepare('UPDATE products SET owner_id=? WHERE id=?').run(ownerId, p.id);
+}
+
+if (fallbackOwner) {
+  db.prepare('UPDATE customers SET created_by=? WHERE created_by IS NULL').run(fallbackOwner.id);
+  db.prepare('UPDATE products SET owner_id=? WHERE owner_id IS NULL').run(fallbackOwner.id);
+  db.prepare('UPDATE documents SET owner_id=? WHERE owner_id IS NULL').run(fallbackOwner.id);
+  db.prepare('UPDATE files SET owner_id=? WHERE owner_id IS NULL').run(fallbackOwner.id);
+}
+db.exec('DROP INDEX IF EXISTS idx_customers_name');
+db.exec('DROP INDEX IF EXISTS idx_products_name_spec');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_owner_name ON customers(created_by, name)');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_products_owner_name_spec ON products(owner_id, name, spec)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_products_owner ON products(owner_id)');
 
 export function all(sql, ...params) {
   return db.prepare(sql).all(...params).map((r) => ({ ...r }));

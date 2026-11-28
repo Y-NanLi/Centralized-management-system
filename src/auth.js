@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { SECRET, TOKEN_TTL } from './config.js';
-import { get, run, tx } from './db.js';
+import { all, get, run, tx } from './db.js';
 import { hashPassword } from './password.js';
 import { nowISO, unauthorized, forbidden } from './util.js';
 
@@ -63,19 +63,38 @@ export function clearGuestCookie(res) {
   setGuestCookie(res, '', true);
 }
 
-/** 登录时把该浏览器游客名下的单据、文件、客户来源合并到账号 */
+/** 登录/注册时把该浏览器游客名下的单据、文件、客户、货品合并到账号 */
 export function mergeGuestData(guestUserId, userId) {
   const docs = get('SELECT COUNT(*) AS c FROM documents WHERE owner_id=?', guestUserId).c;
   const files = get('SELECT COUNT(*) AS c FROM files WHERE owner_id=?', guestUserId).c;
   const customers = get('SELECT COUNT(*) AS c FROM customers WHERE created_by=?', guestUserId).c;
-  if (!docs && !files && !customers) return { documents: 0, files: 0, customers: 0 };
+  const products = get('SELECT COUNT(*) AS c FROM products WHERE owner_id=?', guestUserId).c;
+  if (!docs && !files && !customers && !products) return { documents: 0, files: 0, customers: 0, products: 0 };
   tx(() => {
     run('UPDATE documents SET owner_id=? WHERE owner_id=?', userId, guestUserId);
     run('UPDATE files SET owner_id=? WHERE owner_id=?', userId, guestUserId);
-    run('UPDATE customers SET created_by=? WHERE created_by=?', userId, guestUserId);
+
+    /* 客户按「名称 + 归属人」唯一；同名客户合并，并把单据改挂到账号的客户 */
+    for (const c of all('SELECT id,name FROM customers WHERE created_by=?', guestUserId)) {
+      const target = get('SELECT id FROM customers WHERE created_by=? AND name=?', userId, c.name);
+      if (target) {
+        run('UPDATE documents SET customer_id=? WHERE customer_id=?', target.id, c.id);
+        run('DELETE FROM customers WHERE id=?', c.id);
+      } else {
+        run('UPDATE customers SET created_by=? WHERE id=?', userId, c.id);
+      }
+    }
+
+    /* 货品按「品名 + 规格 + 归属人」唯一；同款只保留账号已有的一条 */
+    for (const p of all('SELECT id,name,spec FROM products WHERE owner_id=?', guestUserId)) {
+      const target = get('SELECT id FROM products WHERE owner_id=? AND name=? AND spec=?', userId, p.name, p.spec);
+      if (target) run('DELETE FROM products WHERE id=?', p.id);
+      else run('UPDATE products SET owner_id=? WHERE id=?', userId, p.id);
+    }
+
     run("DELETE FROM users WHERE id=? AND role='guest'", guestUserId);
   });
-  return { documents: docs, files, customers };
+  return { documents: docs, files, customers, products };
 }
 
 export function signToken(user) {

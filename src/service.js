@@ -42,7 +42,8 @@ export function nextNo(type, companyCode, subtype) {
 export function ensureCustomer(name, extra = {}, userId) {
   const clean = str(name, 100);
   if (!clean) return null;
-  const old = get('SELECT * FROM customers WHERE name=?', clean);
+  const ownerId = num(userId) || null;
+  const old = get('SELECT * FROM customers WHERE name=? AND created_by=?', clean, ownerId);
   if (old) {
     const patch = {};
     for (const k of ['addr', 'contact', 'phone', 'fax', 'tax_no']) {
@@ -56,25 +57,26 @@ export function ensureCustomer(name, extra = {}, userId) {
   }
   return run('INSERT INTO customers (name,addr,contact,phone,fax,tax_no,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
     clean, str(extra.addr, 200), str(extra.contact, 60), str(extra.phone, 60), str(extra.fax, 60), str(extra.tax_no, 60),
-    userId || null, nowISO(), nowISO()).lastId;
+    ownerId, nowISO(), nowISO()).lastId;
 }
 
-export function saveProducts(items = [], unitDefault = '') {
+export function saveProducts(items = [], unitDefault = '', ownerId = null) {
+  const owner = num(ownerId) || null;
   const list = (items || []).filter((it) => str(it.name) && (str(it.spec) || str(it.unit)));
   for (const it of list) {
     const name = str(it.name, 120);
     const spec = str(it.spec, 120);
     const unit = str(it.unit, 20) || str(unitDefault, 20);
     const price = money(it.price);
-    const old = get('SELECT id FROM products WHERE name=? AND spec=?', name, spec);
+    const old = get('SELECT id FROM products WHERE name=? AND spec=? AND owner_id=?', name, spec, owner);
     if (old) {
       if (price > 0 || unit) {
         run('UPDATE products SET price=CASE WHEN ?>0 THEN ? ELSE price END, unit=CASE WHEN length(?)>0 THEN ? ELSE unit END, updated_at=? WHERE id=?',
           price, price, unit, unit, nowISO(), old.id);
       }
     } else if (price > 0 || unit) {
-      run('INSERT INTO products (name,spec,unit,price,created_at,updated_at) VALUES (?,?,?,?,?,?)',
-        name, spec, unit, price, nowISO(), nowISO());
+      run('INSERT INTO products (name,spec,unit,price,owner_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
+        name, spec, unit, price, owner, nowISO(), nowISO());
     }
   }
 }
@@ -170,11 +172,12 @@ export function createDocument(input, user) {
       }
     }
     const custName = (payload.cust && payload.cust.name) || payload.customer || '';
+    const ownerId = num(input.owner_id) || (user ? user.id : null);
     const customerId = num(input.customer_id) || ensureCustomer(custName, {
       addr: payload.cust && payload.cust.addr,
       contact: payload.cust && (payload.cust.rep || payload.cust.contact),
       phone: payload.cust && payload.cust.phone,
-    }, user && user.id);
+    }, ownerId);
     const no = str(input.doc_no, 60) || nextNo(type, company.code, payload.dtype);
     if (get('SELECT id FROM documents WHERE doc_no=?', no)) {
       throw new HttpError(400, '单据编号已存在：' + no, 'duplicate_no');
@@ -183,7 +186,7 @@ export function createDocument(input, user) {
     const amount = input.amount != null ? money(input.amount) : docAmount(payload, type);
     const id = run(`INSERT INTO documents (doc_no,type,status,company_id,customer_id,owner_id,doc_date,amount,tax_rate,title,remark,payload,parent_id,root_id,created_at,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      no, type, str(input.status, 20) || 'draft', company.id, customerId || null, user ? user.id : null,
+      no, type, str(input.status, 20) || 'draft', company.id, customerId || null, ownerId,
       str(input.doc_date, 20) || new Date().toISOString().slice(0, 10), amount, num(input.tax_rate),
       str(input.title, 120) || `${customerName(customerId)} ${TYPE_LABEL[type]}`.trim(),
       str(input.remark, 500), JSON.stringify(payload), num(input.parent_id) || null, num(input.root_id) || null,
@@ -191,7 +194,7 @@ export function createDocument(input, user) {
     if (!get('SELECT root_id FROM documents WHERE id=?', id).root_id) {
       run('UPDATE documents SET root_id=? WHERE id=?', id, id);
     }
-    saveProducts(payload.items || [], payload.items && payload.items[0] ? payload.items[0].unit : '');
+    saveProducts(payload.items || [], payload.items && payload.items[0] ? payload.items[0].unit : '', ownerId);
     return get('SELECT * FROM documents WHERE id=?', id);
   });
 }

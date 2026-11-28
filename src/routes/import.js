@@ -138,8 +138,8 @@ export function register(router) {
 
     for (const c of collectCustomers(o)) {
       try {
-        if (!get('SELECT id FROM customers WHERE name=?', c.name)) {
-          ensureCustomer(c.name, c);
+        if (!get('SELECT id FROM customers WHERE name=? AND created_by=?', c.name, ctx.user.id)) {
+          ensureCustomer(c.name, c, ctx.user.id);
           result.customers++;
         }
       } catch (e) { result.errors.push('客户 ' + c.name + '：' + e.message); }
@@ -147,10 +147,10 @@ export function register(router) {
 
     for (const p of collectProducts(o)) {
       try {
-        const old = get('SELECT id FROM products WHERE name=? AND spec=?', p.name, p.spec);
+        const old = get('SELECT id FROM products WHERE name=? AND spec=? AND owner_id=?', p.name, p.spec, ctx.user.id);
         if (!old) {
-          run('INSERT INTO products (name,spec,unit,price,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
-            p.name, p.spec, p.unit, p.price, '旧系统导入', nowISO(), nowISO());
+          run('INSERT INTO products (name,spec,unit,price,note,owner_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
+            p.name, p.spec, p.unit, p.price, '旧系统导入', ctx.user.id, nowISO(), nowISO());
           result.products++;
         }
       } catch (e) { result.errors.push('货品 ' + p.name + '：' + e.message); }
