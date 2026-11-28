@@ -27,23 +27,68 @@ async function pageDocs(q, my) {
   const ownerOpts = state.user.role === 'admin' ? `<option value="">全部成员</option>` + state.owners.map((o) =>
     `<option value="${o.id}" ${String(o.id) === owner ? 'selected' : ''}>${esc(o.display_name)}${o.role === 'guest' ? '（游客）' : ''}</option>`).join('') : '';
 
-  const rows = data.items.map((x) => `<tr class="clickable" data-id="${x.id}" title="点击进入编辑 / 预览">
+  const typeOrder = { quote: 0, contract: 1, delivery: 2 };
+  const docRow = (x, relation, inChain) => `<tr class="clickable ${inChain ? 'chain-member' : ''}" data-id="${x.id}" title="点击进入编辑 / 预览">
       <td><span class="type-tag ${x.type}">${typeLabel(x.type)}</span></td>
       <td class="mono">${esc(x.doc_no)}</td>
       <td>${esc(x.customer_name || '—')}</td>
-      <td class="tiny">${x.chain_size > 1 ? '链路 ' + x.chain_size + ' 张' : '—'}</td>
+      <td class="tiny">${esc(relation || '—')}</td>
       <td class="right nowrap">￥${fmt(x.amount)}</td>
       <td><span class="badge ${x.status}">${statusLabel(x.type, x.status)}</span>
         ${x.type === 'delivery' && x.warehouse_status && x.warehouse_status !== 'none' ? `<div style="margin-top:3px"><span class="badge ${x.warehouse_status === 'done' ? 'accepted' : (x.warehouse_status === 'received' ? 'sent' : 'draft')}">仓 ${({ pending: '待接收', received: '处理中', done: '已完成' })[x.warehouse_status] || x.warehouse_status}</span></div>` : ''}</td>
       <td class="tiny nowrap">${esc(x.doc_date)}</td>
       <td class="tiny nowrap">${esc(x.owner_name || x.owner_username || '')}</td>
-    </tr>`).join('');
+    </tr>`;
+  const groups = new Map();
+  data.items.forEach((x) => {
+    const key = String(x.root_id || x.id);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(x);
+  });
+  const rows = Array.from(groups.values()).map((list) => {
+    const byId = new Map(list.map((x) => [Number(x.id), x]));
+    const kidsOf = (pid) => list.filter((x) => Number(x.parent_id) === pid)
+      .sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9) || Number(a.id) - Number(b.id));
+    const ordered = [];
+    const seen = new Set();
+    const walk = (x) => {
+      if (seen.has(Number(x.id))) return;
+      seen.add(Number(x.id));
+      ordered.push(x);
+      kidsOf(Number(x.id)).forEach(walk);
+    };
+    list.filter((x) => !byId.has(Number(x.parent_id)))
+      .sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9) || Number(a.id) - Number(b.id))
+      .forEach(walk);
+    list.filter((x) => !seen.has(Number(x.id)))
+      .sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9) || Number(a.id) - Number(b.id))
+      .forEach(walk);
+    const sorted = ordered;
+    if (!list.some((x) => x.chain_size > 1)) return docRow(sorted[0], '', false);
+    const rootDoc = sorted.find((x) => x.type === 'quote') || sorted[0];
+    const chainTotal = rootDoc.chain_size || list.length;
+    const countText = chainTotal > list.length ? `共 ${chainTotal} 张 · 本页 ${list.length}` : `共 ${chainTotal} 张`;
+    const rootType = rootDoc.root_type || rootDoc.type;
+    const pathText = rootType === 'quote' ? '报价单 → 合同 → 送货单' : rootType === 'contract' ? '合同 → 送货单' : '';
+    const header = `<tr class="chain-group"><td colspan="8"><div class="chain-group-head">
+        <span class="cg-label">关联单据</span>
+        <b>${esc(rootDoc.root_doc_no || rootDoc.doc_no)}</b>
+        <span class="badge">${countText}</span>
+        <span class="cg-cust">${esc(rootDoc.customer_name || '')}</span>
+        <span class="cg-path">${pathText}</span>
+      </div></td></tr>`;
+    return header + sorted.map((x) => {
+      const parent = byId.get(Number(x.parent_id));
+      const relation = parent ? `${typeLabel(parent.type)} → ${typeLabel(x.type)}` : '根单据';
+      return docRow(x, relation, true);
+    }).join('');
+  }).join('');
 
   const pages = Math.max(1, Math.ceil(data.total / data.page_size));
   const tabHref = (t) => '#/docs?' + new URLSearchParams({ ...(t ? { type: t } : {}), ...(owner ? { owner } : {}) }).toString();
   const title = owner ? `${(state.owners.find((o) => String(o.id) === owner) || {}).display_name || '成员'}的单据` : '单据中心';
   const v = view(`
-    <div class="page-head"><div><h2>${esc(title)}</h2><div class="desc">共 ${data.total} 张 · 报价 → 合同 → 送货单 可逐级派生，客户与明细自动带过去</div></div>
+    <div class="page-head"><div><h2>${esc(title)}</h2><div class="desc">共 ${data.total} 张 · 编号全系统共用，遇到已占用号自动跳过 · 关联单据会分组显示</div></div>
       ${owner ? '<div class="tiny">正在查看成员单据，新建请切回“全部成员”</div>' : `<div class="actions"><button class="btn" data-new="quote">+ 报价单</button><button class="btn" data-new="contract">+ 合同</button><button class="btn primary" data-new="delivery">+ 送货单</button></div>`}</div>
     <div class="card">
       <div class="toolbar">

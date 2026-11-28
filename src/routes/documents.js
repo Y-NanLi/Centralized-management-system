@@ -87,13 +87,15 @@ export function register(router) {
     const total = get(`SELECT COUNT(*) AS c FROM documents d LEFT JOIN customers c ON c.id=d.customer_id ${sqlWhere}`, ...params).c;
     const rows = all(`SELECT d.id,d.doc_no,d.type,d.status,d.warehouse_status,d.warehouse_at,
         d.doc_date,d.amount,d.title,d.customer_id,d.company_id,
-        d.parent_id,d.created_at,d.updated_at,c.name AS customer_name,co.code AS company_code,co.name AS company_name,
+        d.parent_id,d.root_id,d.created_at,d.updated_at,c.name AS customer_name,co.code AS company_code,co.name AS company_name,
+        rd.doc_no AS root_doc_no, rd.type AS root_type,
         u.name AS owner_name, u.username AS owner_username,
         (SELECT COUNT(*) FROM documents x WHERE x.root_id=d.root_id AND x.deleted_at IS NULL) AS chain_size
       FROM documents d
       LEFT JOIN customers c ON c.id=d.customer_id
       LEFT JOIN companies co ON co.id=d.company_id
       LEFT JOIN users u ON u.id=d.owner_id
+      LEFT JOIN documents rd ON rd.id=d.root_id
       ${sqlWhere}
       ORDER BY d.doc_date DESC, d.id DESC LIMIT ? OFFSET ?`, ...params, pageSize, (page - 1) * pageSize);
     return { items: rows, total, page, page_size: pageSize };

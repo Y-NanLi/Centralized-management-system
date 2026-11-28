@@ -91,6 +91,15 @@ table.tb th.right,table.tb td.right{text-align:right}
 table.tb td{padding:10px;border-bottom:1px solid #eef2f7;vertical-align:middle}
 table.tb tr:hover td{background:#fafcff}
 table.tb tr.clickable{cursor:pointer}
+table.tb tr.chain-group td{padding:7px 10px;background:#f5f9ff;border-top:1px solid #dce7f7;border-bottom:1px solid #dce7f7}
+.chain-group-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#5b687c}
+.cg-label{font-size:10.5px;font-weight:600;color:#2f6fd0;background:#e8f1fd;border-radius:4px;padding:2px 6px}
+.chain-group-head b{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#1f324f}
+.cg-cust{font-size:12px;font-weight:600;color:#39475c}
+.cg-path{font-size:11px;color:#8a96a8;margin-left:auto}
+table.tb tr.chain-member td{background:#fcfdff}
+table.tb tr.chain-member td:first-child{border-left:3px solid #dfeaf9;padding-left:14px}
+table.tb tr.chain-member:hover td{background:#f7fbff}
 .mono{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:12.5px}
 .muted{color:var(--muted)}
 .tiny{font-size:11.5px;color:var(--muted)}
@@ -461,6 +470,7 @@ table.tb tr.clickable{cursor:pointer}
   .stat .v{font-size:22px;margin-top:3px}
   table.tb{min-width:620px}
   table.tb th,table.tb td{padding:8px}
+  .cg-path{margin-left:0}
   .file-row{flex-wrap:wrap}
   .file-row .t{flex-basis:calc(100% - 44px)}
   .file-row .btn.sm{flex:0 0 auto}
