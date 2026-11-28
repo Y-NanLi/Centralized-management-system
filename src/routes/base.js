@@ -19,7 +19,6 @@ export function register(router) {
     statuses: Object.fromEntries(Object.entries(STATUSES).map(([k, v]) => [k, v.map(([key, label]) => ({ key, label }))])),
     roles: [
       { key: 'admin', label: '管理员' },
-      { key: 'manager', label: '主管' },
       { key: 'sales', label: '业务员' },
       { key: 'warehouse', label: '仓库' },
     ],
@@ -37,7 +36,7 @@ export function register(router) {
       str(ctx.body.rep, 40), str(ctx.body.phone, 60), str(ctx.body.fax, 60), new Date().toISOString(), id);
     audit(ctx.user.id, 'company.update', 'company', c.code, ctx.req.socket.remoteAddress);
     return get('SELECT * FROM companies WHERE id=?', id);
-  }, { roles: ['admin', 'manager'] });
+  }, { roles: ['admin'] });
 
   router.post('/api/companies/:id/:kind', async (ctx) => {
     const id = Number(ctx.params.id);
@@ -52,7 +51,7 @@ export function register(router) {
     run(`UPDATE companies SET ${kind}_file_id=?, updated_at=? WHERE id=?`, fid, new Date().toISOString(), id);
     audit(ctx.user.id, `company.${kind}`, 'company', c.code, ctx.req.socket.remoteAddress);
     return get('SELECT * FROM companies WHERE id=?', id);
-  }, { roles: ['admin', 'manager'] });
+  }, { roles: ['admin'] });
 
   /* ---------- 客户 ---------- */
   router.get('/api/customers', (ctx) => {
@@ -166,7 +165,7 @@ export function register(router) {
     run('DELETE FROM customers WHERE id=?', id);
     audit(ctx.user.id, 'customer.delete', 'customer', c.name, ctx.req.socket.remoteAddress);
     return { ok: true };
-  }, { roles: ['admin', 'manager'] });
+  }, { roles: ['admin'] });
 
   /* ---------- 货品 ---------- */
   router.get('/api/products', (ctx) => {
@@ -223,6 +222,7 @@ export function register(router) {
   /* ---------- 数据导出 ---------- */
   router.get('/api/export/backup', (ctx) => {
     const owner = requestedOwner(ctx.user, ctx.query);
+    const ownerSql = owner ? ' AND owner_id=?' : '';
     const where = ['deleted_at IS NULL'];
     const ownerParam = [];
     if (owner) { where.push('owner_id=?'); ownerParam.push(owner); }
@@ -239,7 +239,7 @@ export function register(router) {
       documents: docs.map((d) => ({ ...d, payload: JSON.parse(d.payload || '{}') })),
       note: '本文件只含结构化数据；上传的文件实体请一并备份 data/files 目录。',
     };
-  }, { roles: ['admin', 'manager'] });
+  }, { roles: ['admin'] });
 
   /* ---------- 编号预览 ---------- */  router.get('/api/number/next', (ctx) => {
     const companyId = num(ctx.query.get('company_id'));

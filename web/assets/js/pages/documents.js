@@ -474,7 +474,7 @@ function fileRow(f) {
       <div class="t"><b>${esc(f.name)}</b><span>${(Number(f.size) / 1024).toFixed(0)} KB · ${esc(f.created_at.slice(0, 16).replace('T', ' '))}</span></div>
       <a class="btn sm" href="/api/files/${f.id}/raw?token=${encodeURIComponent(state.token)}" target="_blank">查看</a>
       <a class="btn sm" href="/api/files/${f.id}/download?token=${encodeURIComponent(state.token)}">下载</a>
-      ${['admin', 'manager'].includes(state.user.role) ? `<button class="btn sm danger" data-unlink="${f.id}">移除</button>` : ''}
+      ${state.user.role === 'admin' ? `<button class="btn sm danger" data-unlink="${f.id}">移除</button>` : ''}
     </div>`;
 }
 

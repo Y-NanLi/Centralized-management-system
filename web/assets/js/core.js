@@ -25,7 +25,7 @@ const statusLabel = (t, s) => {
   const list = (state.meta && state.meta.statuses && state.meta.statuses[t]) || [];
   return (list.find((x) => x.key === s) || {}).label || s;
 };
-const roleLabel = (r) => ({ admin: '管理员', manager: '主管', sales: '业务员', warehouse: '仓库', guest: '游客' }[r] || r);
+const roleLabel = (r) => ({ admin: '管理员', sales: '业务员', warehouse: '仓库', guest: '游客' }[r] || r);
 
 function fileUrl(id) {
   return `/api/files/${id}/raw${state.token ? '?token=' + encodeURIComponent(state.token) : ''}`;

@@ -217,6 +217,9 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(deleted_at)');
 db.exec('DROP INDEX IF EXISTS idx_documents_no');
 db.exec('CREATE INDEX IF NOT EXISTS idx_documents_no ON documents(doc_no)');
 
+/* ---------- v1.15 移除主管角色：历史 manager 账号按最小权限降为业务员 ---------- */
+db.exec("UPDATE users SET role='sales' WHERE role='manager'");
+
 export function all(sql, ...params) {
   return db.prepare(sql).all(...params).map((r) => ({ ...r }));
 }

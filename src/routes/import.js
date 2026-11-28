@@ -187,5 +187,5 @@ export function register(router) {
 
     audit(ctx.user.id, 'import.legacy', 'backup', JSON.stringify(result), ctx.req.socket.remoteAddress);
     return result;
-  }, { roles: ['admin', 'manager'] });
+  }, { roles: ['admin'] });
 }

@@ -3,7 +3,7 @@ import { audit } from '../auth.js';
 import { bad, notFound, forbidden, str } from '../util.js';
 import { normalizeUsername } from '../username.js';
 
-const ROLES = ['admin', 'manager', 'sales', 'warehouse'];
+const ROLES = ['admin', 'sales', 'warehouse'];
 
 export function register(router) {
   router.get('/api/users', () => all(
