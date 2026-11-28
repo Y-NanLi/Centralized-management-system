@@ -68,7 +68,7 @@ export function register(router) {
     const from = q.get('from');
     const to = q.get('to');
     const page = Math.max(1, num(q.get('page'), 1));
-    const pageSize = Math.min(100, Math.max(5, num(q.get('page_size'), 20)));
+    const pageSize = Math.min(100, Math.max(5, Number(q.get('page_size')) || 20));
     const where = ['d.deleted_at IS NULL'];
     const params = [];
     const owner = requestedOwner(ctx.user, q);
