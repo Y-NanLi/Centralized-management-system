@@ -41,7 +41,8 @@ async function pageSettings(q, my) {
       v1.10.1 修复单据中心每页只显示 5 张的问题，恢复为每页 20 张，关联单据通常能整组放在同一页。<br>
       v1.11.0 单据中心单击查看详情、双击进入编辑；详情流程图双击报价单或销售合同卡片也进入编辑。<br>
       v1.12.0 已生成下游单据的上游单据锁定客户、明细、金额等关键字段，只保留状态、备注和附件；列表按业务链分页，同一链不跨页；新增日期、客户和待转合同/待送货等快捷筛选。<br>
-      v1.13.0 单据编辑器增加本地草稿自动暂存与恢复，按账号和单据隔离；崩溃或误关后重新打开可恢复，保存成功自动清除，14 天过期。</div>
+      v1.13.0 单据编辑器增加本地草稿自动暂存与恢复，按账号和单据隔离；崩溃或误关后重新打开可恢复，保存成功自动清除，14 天过期。<br>
+      v1.14.0 回收站单据增加“查看”，永久删除前可只读核对客户、金额、明细、备注、附件、删除人和剩余保留天数。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
@@ -50,7 +51,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">CRM系统 v1.13.0 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">CRM系统 v1.14.0 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 

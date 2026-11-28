@@ -31,6 +31,31 @@ export function register(router) {
     };
   });
 
+  /* 回收站单据只读查看：永久删除前核对客户、明细、金额、备注和附件 */
+  router.get('/api/recycle/documents/:id', (ctx) => {
+    const id = Number(ctx.params.id);
+    const d = get(`SELECT d.*, c.name AS customer_name, co.code AS company_code, co.name AS company_name,
+        u.name AS owner_name, u.username AS owner_username,
+        du.name AS deleted_by_name, du.username AS deleted_by_username
+      FROM documents d
+      LEFT JOIN customers c ON c.id=d.customer_id
+      LEFT JOIN companies co ON co.id=d.company_id
+      LEFT JOIN users u ON u.id=d.owner_id
+      LEFT JOIN users du ON du.id=d.deleted_by
+      WHERE d.id=? AND d.deleted_at IS NOT NULL`, id);
+    if (!d) throw notFound('回收站里没有这张单据');
+    assertOwner(ctx.user, d);
+    let payload = {};
+    try { payload = JSON.parse(d.payload || '{}'); } catch { payload = {}; }
+    delete d.payload;
+    const files = all(`SELECT f.id,f.name,f.mime,f.size,f.category,df.created_at
+      FROM document_files df JOIN files f ON f.id=df.file_id
+      WHERE df.document_id=? AND f.deleted_at IS NULL ORDER BY df.id DESC`, id);
+    const parent = d.parent_id ? get(`SELECT id,doc_no,type,status FROM documents
+      WHERE id=? AND deleted_at IS NULL`, d.parent_id) : null;
+    return { ...d, payload, files, parent, days_left: daysLeft(d.deleted_at) };
+  });
+
   router.post('/api/recycle/documents/:id/restore', (ctx) => {
     const id = Number(ctx.params.id);
     const d = get('SELECT * FROM documents WHERE id=? AND deleted_at IS NOT NULL', id);
