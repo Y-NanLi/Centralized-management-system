@@ -9,6 +9,7 @@
 - 后端：Node.js 22 + 内置 `node:sqlite`（零第三方依赖，不需要 npm install）
 - 前端：原生 ES Module 单页（无构建步骤，改完刷新即生效）
 - 部署：Windows 直接 `node server.js`；NAS / 服务器用 Docker，数据挂载到 `./data`
+- 详细部署步骤（飞牛 fnOS Docker / Windows、更新、迁移、备份、常见报错）见 [`docs/部署说明.md`](docs/部署说明.md)
 
 ---
 
@@ -97,6 +98,8 @@
 3. 浏览器打开 http://localhost:8099
 4. 默认管理员用户名 **admin**，免密码登录；普通用户可在登录页自助注册中文用户名
 
+完整的 Windows 环境要求、局域网访问、防火墙、开机自启、升级与备份步骤见 [`docs/部署说明.md`](docs/部署说明.md#二windows-部署)。
+
 数据目录默认是项目下的 `data/`（可用环境变量 `DATA_DIR` 指定）：
 
 ```
@@ -119,6 +122,8 @@ docker compose up -d --build
 
 `docker-compose.yml` 已把 `./data` 挂到容器 `/app/data`，重建容器数据不丢。
 端口 8099，和旧的 8090（报价单）/ 8091（合同）/ 8088（送货单）不冲突，可以并存过渡。
+
+飞牛 fnOS 逐步部署（源码构建 / 镜像导入、迁移、更新、备份、常见报错）见 [`docs/部署说明.md`](docs/部署说明.md#一docker-部署飞牛-fnos)。
 
 生产建议在 compose 里固定 `APP_SECRET`（任意长随机串），否则重建容器会让所有人重新登录一次。
 
@@ -165,7 +170,8 @@ Compress-Archive -Path .\data -DestinationPath "D:\backup\jizhong-$(Get-Date -Fo
 ├── Dockerfile
 ├── docker-compose.yml
 ├── 启动.bat
-└── docs/系统设计.md        三个旧项目的分析、架构与数据模型说明
+├── docs/系统设计.md        三个旧项目的分析、架构与数据模型说明
+└── docs/部署说明.md        Windows / Docker 部署、更新、迁移与备份
 ```
 
 ---
