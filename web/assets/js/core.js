@@ -25,7 +25,7 @@ const statusLabel = (t, s) => {
   const list = (state.meta && state.meta.statuses && state.meta.statuses[t]) || [];
   return (list.find((x) => x.key === s) || {}).label || s;
 };
-const roleLabel = (r) => ({ admin: '管理员', manager: '主管', sales: '业务员', guest: '游客' }[r] || r);
+const roleLabel = (r) => ({ admin: '管理员', manager: '主管', sales: '业务员', warehouse: '仓库', guest: '游客' }[r] || r);
 
 function fileUrl(id) {
   return `/api/files/${id}/raw${state.token ? '?token=' + encodeURIComponent(state.token) : ''}`;
@@ -129,4 +129,11 @@ function rerender() {
   else location.reload();
 }
 
-export { state, app, esc, fmt, qtyFmt, today, typeLabel, statusLabel, roleLabel, fileUrl, api, toast, modal, confirmBox, cnyUpper, parseHash, rerender };
+function dt(iso, fallback = '—') {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return fallback;
+  return d.toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-');
+}
+
+export { state, app, esc, fmt, qtyFmt, today, typeLabel, statusLabel, roleLabel, fileUrl, api, toast, modal, confirmBox, cnyUpper, parseHash, rerender, dt };

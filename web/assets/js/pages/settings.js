@@ -18,7 +18,8 @@ async function pageSettings(q, my) {
     <div class="card" style="margin-top:14px"><h3>账号</h3>
       <div class="kv"><div><div class="k">当前账号</div><div class="v">${esc(state.user.name || state.user.username)}（${esc(state.user.username)} · ${esc(roleLabel(state.user.role))}）</div></div></div>
       <div class="tiny" style="margin-top:10px;line-height:1.9">系统已改为免密码登录，凭用户名识别身份。用户名支持中文、字母、数字、下划线、点或短横；新用户可在登录页自助注册。<br>
-      普通账号只能看到自己的工作台、客户、货品、单据和文件；管理员可查看全部成员，并在工作台按成员切换。</div>
+      普通账号只能看到自己的工作台、客户、货品、单据和文件；管理员可查看全部成员，并在工作台按成员切换。<br>
+      v1.8 新增“仓库”角色：业务员可把送货单交仓库，仓库接收后编辑、打印、完成；删除的单据和文件进入回收站保留 30 天，到期自动永久删除。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
@@ -27,7 +28,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">集中管理系统 v1.7 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">集中管理系统 v1.8 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 

@@ -50,6 +50,11 @@ async function pageDocEdit(q, my) {
   const id = q.get('id');
   const d = await api('/documents/' + id);
   if (my !== seq) return;
+  if (state.user.role === 'warehouse' && d.type === 'delivery' && d.warehouse_status === 'pending') {
+    toast('请先在仓库打单页接收这张送货单', true);
+    location.hash = '#/doc?id=' + d.id;
+    return;
+  }
   const ed = {
     id: d.id, type: d.type, payload: d.payload, status: d.status, doc_date: d.doc_date,
     doc_no: d.doc_no, title: d.title, remark: d.remark, company_id: d.company_id, owner_name: d.owner_name,

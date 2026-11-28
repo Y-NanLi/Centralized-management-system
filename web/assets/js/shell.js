@@ -14,16 +14,20 @@ async function loadBase() {
 const NAV = [
   { key: 'dashboard', label: '工作台', icon: '◪', href: '#/dashboard' },
   { key: 'docs', label: '单据中心', icon: '▤', href: '#/docs' },
+  { key: 'warehouse', label: '仓库打单', icon: '▣', href: '#/warehouse', warehouse: true },
   { key: 'customers', label: '客户档案', icon: '◎', href: '#/customers' },
   { key: 'products', label: '货品库', icon: '▦', href: '#/products' },
   { key: 'files', label: '文件库', icon: '▧', href: '#/files' },
+  { key: 'recycle', label: '回收站', icon: '♻', href: '#/recycle' },
   { key: 'users', label: '用户管理', icon: '◍', href: '#/users', admin: true },
   { key: 'settings', label: '系统设置', icon: '⚙', href: '#/settings' },
 ];
 
 function renderShell() {
   const isGuest = state.user.role === 'guest';
-  const nav = NAV.filter((n) => (!n.admin || state.user.role === 'admin') && (!isGuest || n.key !== 'settings')).map((n) => `
+  const nav = NAV.filter((n) => (!n.admin || state.user.role === 'admin')
+    && (!n.warehouse || ['admin', 'warehouse'].includes(state.user.role))
+    && (!isGuest || n.key !== 'settings')).map((n) => `
     <a class="nav-item" data-nav="${n.key}" href="${n.href}"><span class="ic">${n.icon}</span>${n.label}</a>`).join('');
   app.innerHTML = `<div class="shell">
       <aside class="sidebar">

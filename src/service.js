@@ -34,9 +34,11 @@ export function nextNo(type, companyCode, subtype) {
   }
   const key = `${code}-${tc}-${day}`;
   const row = get('SELECT n FROM number_seq WHERE key=?', key);
-  const n = (row ? row.n : 0) + 1;
+  const last = get('SELECT doc_no FROM documents WHERE doc_no LIKE ? ORDER BY doc_no DESC LIMIT 1', `${key}-%`);
+  const lastN = last ? Number(String(last.doc_no).slice(key.length + 1)) : 0;
+  const n = Math.max(row ? row.n : 0, Number.isFinite(lastN) ? lastN : 0) + 1;
   run('INSERT INTO number_seq (key,n) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET n=excluded.n', key, n);
-  return `${code}-${tc}-${day}-${String(n).padStart(3, '0')}`;
+  return `${key}-${String(n).padStart(3, '0')}`;
 }
 
 export function ensureCustomer(name, extra = {}, userId) {

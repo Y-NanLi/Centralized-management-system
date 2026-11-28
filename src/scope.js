@@ -5,6 +5,25 @@ export function isAdmin(user) {
   return !!user && user.role === 'admin';
 }
 
+export function isWarehouse(user) {
+  return !!user && user.role === 'warehouse';
+}
+
+/** 单据访问：本人 / 管理员 / 仓库角色对已提交仓库的送货单 */
+export function canAccessDocument(user, row) {
+  if (!user || !row) return false;
+  if (isAdmin(user)) return true;
+  if (Number(row.owner_id) === Number(user.id)) return true;
+  return isWarehouse(user) && row.type === 'delivery'
+    && !!row.warehouse_status && row.warehouse_status !== 'none';
+}
+
+export function assertDocumentAccess(user, row) {
+  if (!row) throw notFound();
+  if (!canAccessDocument(user, row)) throw notFound();
+  return row;
+}
+
 /** 管理员：不带 owner / owner=all 表示全量；带数字表示查看某个成员。普通用户强制本人。 */
 export function requestedOwner(user, query) {
   if (!user) return null;

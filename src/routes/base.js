@@ -19,6 +19,7 @@ export function register(router) {
       { key: 'admin', label: '管理员' },
       { key: 'manager', label: '主管' },
       { key: 'sales', label: '业务员' },
+      { key: 'warehouse', label: '仓库' },
     ],
   }));
 
@@ -63,9 +64,9 @@ export function register(router) {
       params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
     }
     const rows = all(`SELECT c.*, u.name AS owner_name, u.username AS owner_username,
-        (SELECT COUNT(*) FROM documents d WHERE d.customer_id=c.id) AS doc_count,
-        (SELECT COALESCE(SUM(d.amount),0) FROM documents d WHERE d.customer_id=c.id AND d.status NOT IN ('canceled','closed')) AS total_amount,
-        (SELECT MAX(d.doc_date) FROM documents d WHERE d.customer_id=c.id) AS last_date
+        (SELECT COUNT(*) FROM documents d WHERE d.customer_id=c.id AND d.deleted_at IS NULL) AS doc_count,
+        (SELECT COALESCE(SUM(d.amount),0) FROM documents d WHERE d.customer_id=c.id AND d.deleted_at IS NULL AND d.status NOT IN ('canceled','closed')) AS total_amount,
+        (SELECT MAX(d.doc_date) FROM documents d WHERE d.customer_id=c.id AND d.deleted_at IS NULL) AS last_date
       FROM customers c LEFT JOIN users u ON u.id=c.created_by
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY c.updated_at DESC LIMIT 500`, ...params);
@@ -78,12 +79,12 @@ export function register(router) {
     assertOwner(ctx.user, c, 'created_by');
     const docs = all(`SELECT d.id,d.doc_no,d.type,d.status,d.doc_date,d.amount,d.title,u.name AS owner_name
       FROM documents d LEFT JOIN users u ON u.id=d.owner_id
-      WHERE d.customer_id=? ORDER BY d.doc_date DESC, d.id DESC LIMIT 100`, c.id);
+      WHERE d.customer_id=? AND d.deleted_at IS NULL ORDER BY d.doc_date DESC, d.id DESC LIMIT 100`, c.id);
     const stats = {
       documents: docs.length,
-      contract_amount: all("SELECT COALESCE(SUM(amount),0) AS s FROM documents WHERE customer_id=? AND type='contract' AND status<>'canceled'", c.id)[0].s,
-      quote_count: all("SELECT COUNT(*) AS s FROM documents WHERE customer_id=? AND type='quote'", c.id)[0].s,
-      delivery_count: all("SELECT COUNT(*) AS s FROM documents WHERE customer_id=? AND type='delivery'", c.id)[0].s,
+      contract_amount: all("SELECT COALESCE(SUM(amount),0) AS s FROM documents WHERE customer_id=? AND type='contract' AND status<>'canceled' AND deleted_at IS NULL", c.id)[0].s,
+      quote_count: all("SELECT COUNT(*) AS s FROM documents WHERE customer_id=? AND type='quote' AND deleted_at IS NULL", c.id)[0].s,
+      delivery_count: all("SELECT COUNT(*) AS s FROM documents WHERE customer_id=? AND type='delivery' AND deleted_at IS NULL", c.id)[0].s,
     };
     return { ...c, documents: docs, stats };
   });
@@ -178,10 +179,12 @@ export function register(router) {
   /* ---------- 数据导出 ---------- */
   router.get('/api/export/backup', (ctx) => {
     const owner = requestedOwner(ctx.user, ctx.query);
-    const ownerSql = owner ? ' WHERE owner_id=?' : '';
-    const ownerParam = owner ? [owner] : [];
+    const where = ['deleted_at IS NULL'];
+    const ownerParam = [];
+    if (owner) { where.push('owner_id=?'); ownerParam.push(owner); }
     const docs = all(`SELECT id,doc_no,type,status,company_id,customer_id,owner_id,doc_date,amount,tax_rate,
-      title,remark,payload,parent_id,root_id,created_at,updated_at FROM documents${ownerSql} ORDER BY id`, ...ownerParam);
+      title,remark,payload,parent_id,root_id,created_at,updated_at FROM documents
+      WHERE ${where.join(' AND ')} ORDER BY id`, ...ownerParam);
     return {
       kind: 'jizhong-backup',
       version: 1,

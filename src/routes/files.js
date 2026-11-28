@@ -1,12 +1,14 @@
 import fs from 'node:fs';
-import { all, get, run } from '../db.js';
-import { bad, notFound, str, num } from '../util.js';
+import { all, get } from '../db.js';
+import { bad, notFound, str } from '../util.js';
 import { saveUpload, absFile, fileById } from '../service.js';
 import { assertOwner, isAdmin, isCompanyAsset, requestedOwner } from '../scope.js';
+import { softDeleteFile } from '../recycle.js';
 
 function sendFile(ctx, attachment) {
   const row = fileById(Number(ctx.params.id));
   if (!row) throw notFound('文件不存在');
+  if (row.deleted_at) throw notFound('文件已删除');
   if (!isAdmin(ctx.user) && !isCompanyAsset(row.id)) assertOwner(ctx.user, row);
   const full = absFile(row);
   if (!fs.existsSync(full)) throw notFound('文件已丢失');
@@ -33,7 +35,7 @@ export function register(router) {
     const q = String(ctx.query.get('q') || '').trim();
     const category = String(ctx.query.get('category') || '').trim();
     const owner = requestedOwner(ctx.user, ctx.query);
-    const where = [];
+    const where = ['files.deleted_at IS NULL'];
     const params = [];
     if (owner) { where.push('files.owner_id=?'); params.push(owner); }
     if (q) { where.push('files.name LIKE ?'); params.push(`%${q}%`); }
@@ -53,12 +55,12 @@ export function register(router) {
     const id = Number(ctx.params.id);
     const row = get('SELECT * FROM files WHERE id=?', id);
     if (!row) throw notFound('文件不存在');
+    if (row.deleted_at) throw notFound('文件已删除');
     if (!isAdmin(ctx.user) && !isCompanyAsset(id)) assertOwner(ctx.user, row);
     const used = get('SELECT document_id FROM document_files WHERE file_id=? LIMIT 1', id)
       || get('SELECT id FROM companies WHERE logo_file_id=? OR stamp_file_id=? LIMIT 1', id, id);
     if (used) throw bad('该文件已被单据或公司主体引用，不能删除');
-    try { fs.unlinkSync(absFile(row)); } catch { /* 已不存在 */ }
-    run('DELETE FROM files WHERE id=?', id);
-    return { ok: true };
-  }, { roles: ['admin', 'manager', 'guest'] });
+    softDeleteFile(id, ctx.user.id);
+    return { ok: true, recycled: true };
+  });
 }

@@ -1,7 +1,8 @@
 import { all, get, run } from '../db.js';
 import { audit } from '../auth.js';
 import { bad, notFound, forbidden, str, num, money } from '../util.js';
-import { assertOwner, requestedOwner } from '../scope.js';
+import { assertDocumentAccess, assertOwner, isWarehouse, requestedOwner } from '../scope.js';
+import { softDeleteDocument } from '../recycle.js';
 import {
   createDocument, companyById, customerName, docAmount, ensureCustomer,
   saveProducts, saveUpload, fileById, STATUSES, TYPE_LABEL, defaultPayload,
@@ -23,14 +24,17 @@ function docDetail(id, user) {
     LEFT JOIN customers c ON c.id=d.customer_id
     LEFT JOIN companies co ON co.id=d.company_id
     LEFT JOIN users u ON u.id=d.owner_id
-    WHERE d.id=?`, id);
+    WHERE d.id=? AND d.deleted_at IS NULL`, id);
   if (!d) throw notFound('单据不存在');
-  assertOwner(user, d);
+  assertDocumentAccess(user, d);
   const out = withPayload(d);
   out.files = all(`SELECT f.id,f.name,f.mime,f.size,f.category,df.category AS link_category,df.created_at
-    FROM document_files df JOIN files f ON f.id=df.file_id WHERE df.document_id=? ORDER BY df.id DESC`, id);
-  out.children = all(`SELECT id,doc_no,type,status,doc_date,amount,title FROM documents WHERE parent_id=? ORDER BY id`, id);
-  out.parent = d.parent_id ? get('SELECT id,doc_no,type,status FROM documents WHERE id=?', d.parent_id) : null;
+    FROM document_files df JOIN files f ON f.id=df.file_id
+    WHERE df.document_id=? AND f.deleted_at IS NULL ORDER BY df.id DESC`, id);
+  out.children = all(`SELECT id,doc_no,type,status,doc_date,amount,title FROM documents
+    WHERE parent_id=? AND deleted_at IS NULL${isWarehouse(user) ? " AND type='delivery'" : ''} ORDER BY id`, id);
+  out.parent = (d.parent_id && !isWarehouse(user)) ? get(`SELECT id,doc_no,type,status FROM documents
+    WHERE id=? AND deleted_at IS NULL`, d.parent_id) : null;
   return out;
 }
 
@@ -46,7 +50,7 @@ export function register(router) {
     const to = q.get('to');
     const page = Math.max(1, num(q.get('page'), 1));
     const pageSize = Math.min(100, Math.max(5, num(q.get('page_size'), 20)));
-    const where = [];
+    const where = ['d.deleted_at IS NULL'];
     const params = [];
     const owner = requestedOwner(ctx.user, q);
     if (owner) { where.push('d.owner_id=?'); params.push(owner); }
@@ -62,10 +66,11 @@ export function register(router) {
     }
     const sqlWhere = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const total = get(`SELECT COUNT(*) AS c FROM documents d LEFT JOIN customers c ON c.id=d.customer_id ${sqlWhere}`, ...params).c;
-    const rows = all(`SELECT d.id,d.doc_no,d.type,d.status,d.doc_date,d.amount,d.title,d.customer_id,d.company_id,
+    const rows = all(`SELECT d.id,d.doc_no,d.type,d.status,d.warehouse_status,d.warehouse_at,
+        d.doc_date,d.amount,d.title,d.customer_id,d.company_id,
         d.parent_id,d.created_at,d.updated_at,c.name AS customer_name,co.code AS company_code,co.name AS company_name,
         u.name AS owner_name, u.username AS owner_username,
-        (SELECT COUNT(*) FROM documents x WHERE x.root_id=d.root_id) AS chain_size
+        (SELECT COUNT(*) FROM documents x WHERE x.root_id=d.root_id AND x.deleted_at IS NULL) AS chain_size
       FROM documents d
       LEFT JOIN customers c ON c.id=d.customer_id
       LEFT JOIN companies co ON co.id=d.company_id
@@ -99,9 +104,10 @@ export function register(router) {
 
   router.put('/api/documents/:id', (ctx) => {
     const id = Number(ctx.params.id);
-    const d = get('SELECT * FROM documents WHERE id=?', id);
+    const d = get('SELECT * FROM documents WHERE id=? AND deleted_at IS NULL', id);
     if (!d) throw notFound('单据不存在');
-    assertOwner(ctx.user, d);
+    assertDocumentAccess(ctx.user, d);
+    if (isWarehouse(ctx.user) && d.type === 'delivery' && d.warehouse_status === 'pending') throw bad('请先接收该送货单再编辑');
     const body = ctx.body || {};
     const payload = body.payload && typeof body.payload === 'object' ? body.payload : null;
     const no = str(body.doc_no, 60) || d.doc_no;
@@ -136,19 +142,18 @@ export function register(router) {
 
   router.del('/api/documents/:id', (ctx) => {
     const id = Number(ctx.params.id);
-    const d = get('SELECT * FROM documents WHERE id=?', id);
+    const d = get('SELECT * FROM documents WHERE id=? AND deleted_at IS NULL', id);
     if (!d) throw notFound('单据不存在');
     assertOwner(ctx.user, d);
-    if (get('SELECT id FROM documents WHERE parent_id=? LIMIT 1', id)) throw bad('该单据已派生下游单据，不能直接删除；请先处理关联单据');
-    run('DELETE FROM document_files WHERE document_id=?', id);
-    run('DELETE FROM documents WHERE id=?', id);
-    audit(ctx.user.id, 'doc.delete', d.doc_no, TYPE_LABEL[d.type], ctx.req.socket.remoteAddress);
-    return { ok: true };
-  }, { roles: ['admin', 'manager', 'guest'] });
+    if (get('SELECT id FROM documents WHERE parent_id=? AND deleted_at IS NULL LIMIT 1', id)) throw bad('该单据已派生下游单据，不能删除；请先处理关联单据');
+    softDeleteDocument(id, ctx.user.id);
+    audit(ctx.user.id, 'doc.delete', d.doc_no, '移入回收站', ctx.req.socket.remoteAddress);
+    return { ok: true, recycled: true };
+  });
 
   router.post('/api/documents/:id/status', (ctx) => {
     const id = Number(ctx.params.id);
-    const d = get('SELECT * FROM documents WHERE id=?', id);
+    const d = get('SELECT * FROM documents WHERE id=? AND deleted_at IS NULL', id);
     if (!d) throw notFound('单据不存在');
     assertOwner(ctx.user, d);
     const status = str(ctx.body.status, 20);
@@ -161,6 +166,7 @@ export function register(router) {
   router.post('/api/documents/:id/convert', (ctx) => {
     const id = Number(ctx.params.id);
     const src = docDetail(id, ctx.user);
+    assertOwner(ctx.user, src);
     const to = ctx.body.to;
     if (to === 'contract' && src.type === 'quote') {
       const q = src.payload;
@@ -219,30 +225,34 @@ export function register(router) {
   });
 
   router.get('/api/documents/:id/chain', (ctx) => {
-    const d = get('SELECT * FROM documents WHERE id=?', Number(ctx.params.id));
+    const d = get('SELECT * FROM documents WHERE id=? AND deleted_at IS NULL', Number(ctx.params.id));
     if (!d) throw notFound('单据不存在');
-    assertOwner(ctx.user, d);
+    assertDocumentAccess(ctx.user, d);
     const root = d.root_id || d.id;
-    const rows = all(`SELECT id,doc_no,type,status,doc_date,amount,title,parent_id,root_id
-      FROM documents WHERE id=? OR root_id=? ORDER BY id`, root, root);
+    const rows = isWarehouse(ctx.user)
+      ? all(`SELECT id,doc_no,type,status,doc_date,amount,title,parent_id,root_id
+          FROM documents WHERE (id=? OR root_id=?) AND type='delivery' AND deleted_at IS NULL ORDER BY id`, root, root)
+      : all(`SELECT id,doc_no,type,status,doc_date,amount,title,parent_id,root_id
+          FROM documents WHERE (id=? OR root_id=?) AND deleted_at IS NULL ORDER BY id`, root, root);
     return { root_id: root, nodes: rows };
   });
 
   router.get('/api/documents/:id/files', (ctx) => {
-    const d = get('SELECT id,owner_id FROM documents WHERE id=?', Number(ctx.params.id));
+    const d = get('SELECT id,owner_id,type,warehouse_status FROM documents WHERE id=? AND deleted_at IS NULL', Number(ctx.params.id));
     if (!d) throw notFound('单据不存在');
-    assertOwner(ctx.user, d);
+    assertDocumentAccess(ctx.user, d);
     return all(
       `SELECT f.id,f.name,f.mime,f.size,f.category,df.category AS link_category,df.created_at
-       FROM document_files df JOIN files f ON f.id=df.file_id WHERE df.document_id=? ORDER BY df.id DESC`,
+       FROM document_files df JOIN files f ON f.id=df.file_id
+       WHERE df.document_id=? AND f.deleted_at IS NULL ORDER BY df.id DESC`,
       Number(ctx.params.id));
   });
 
   router.post('/api/documents/:id/files', async (ctx) => {
     const id = Number(ctx.params.id);
-    const d = get('SELECT id,owner_id FROM documents WHERE id=?', id);
+    const d = get('SELECT id,owner_id,type,warehouse_status FROM documents WHERE id=? AND deleted_at IS NULL', id);
     if (!d) throw notFound('单据不存在');
-    assertOwner(ctx.user, d);
+    assertDocumentAccess(ctx.user, d);
     const form = await ctx.form();
     const category = str(ctx.query.get('category'), 30) || 'attachment';
     const files = (form || []).filter((p) => p.filename);
@@ -260,11 +270,11 @@ export function register(router) {
 
   router.del('/api/documents/:id/files/:fileId', (ctx) => {
     const docId = Number(ctx.params.id);
-    const d = get('SELECT id,owner_id FROM documents WHERE id=?', docId);
+    const d = get('SELECT id,owner_id,type,warehouse_status FROM documents WHERE id=? AND deleted_at IS NULL', docId);
     if (!d) throw notFound('单据不存在');
-    assertOwner(ctx.user, d);
+    assertDocumentAccess(ctx.user, d);
     const fileId = Number(ctx.params.fileId);
     run('DELETE FROM document_files WHERE document_id=? AND file_id=?', docId, fileId);
     return { ok: true };
-  }, { roles: ['admin', 'manager', 'guest'] });
+  });
 }

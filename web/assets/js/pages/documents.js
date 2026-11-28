@@ -32,7 +32,8 @@ async function pageDocs(q, my) {
       <td>${esc(x.customer_name || '—')}</td>
       <td class="tiny">${x.chain_size > 1 ? '链路 ' + x.chain_size + ' 张' : '—'}</td>
       <td class="right nowrap">￥${fmt(x.amount)}</td>
-      <td><span class="badge ${x.status}">${statusLabel(x.type, x.status)}</span></td>
+      <td><span class="badge ${x.status}">${statusLabel(x.type, x.status)}</span>
+        ${x.type === 'delivery' && x.warehouse_status && x.warehouse_status !== 'none' ? `<div style="margin-top:3px"><span class="badge ${x.warehouse_status === 'done' ? 'accepted' : (x.warehouse_status === 'received' ? 'sent' : 'draft')}">仓 ${({ pending: '待接收', received: '处理中', done: '已完成' })[x.warehouse_status] || x.warehouse_status}</span></div>` : ''}</td>
       <td class="tiny nowrap">${esc(x.doc_date)}</td>
       <td class="tiny nowrap">${esc(x.owner_name || x.owner_username || '')}</td>
     </tr>`).join('');
@@ -109,8 +110,23 @@ async function pageDocDetail(q, my) {
 
   const statusOpts = state.meta.statuses[d.type].map((s) => `<option value="${s.key}" ${s.key === d.status ? 'selected' : ''}>${s.label}</option>`).join('');
   const files = d.files.map((f) => fileRow(f)).join('');
-  const canConvertContract = d.type === 'quote';
-  const canConvertDelivery = d.type === 'quote' || d.type === 'contract';
+  const isMine = d.owner_id === state.user.id;
+  const canOwn = isMine || state.user.role === 'admin';
+  const canConvertContract = d.type === 'quote' && canOwn;
+  const canConvertDelivery = (d.type === 'quote' || d.type === 'contract') && canOwn;
+  const isWh = state.user.role === 'warehouse';
+  const w = d.warehouse_status || 'none';
+  const wLabel = { none: '未提交', pending: '待仓库接收', received: '仓库处理中', done: '仓库已完成' }[w] || w;
+  const wBadge = w === 'done' ? 'accepted' : (w === 'received' ? 'sent' : (w === 'pending' ? 'draft' : ''));
+  const canEdit = state.user.role !== 'warehouse' || w === 'received';
+  const canStatus = canOwn && state.user.role !== 'warehouse';
+  const canDelete = canOwn;
+  const whActions = d.type === 'delivery' ? [
+    (w === 'none' && canOwn && d.status !== 'canceled') ? '<button class="btn" id="btnSendWh">交仓库</button>' : '',
+    (w === 'pending' && canOwn) ? '<button class="btn" id="btnWithdrawWh">撤回</button>' : '',
+    (w === 'pending' && (isWh || state.user.role === 'admin')) ? '<button class="btn primary" id="btnReceiveWh">接收</button>' : '',
+    (w === 'received' && (isWh || state.user.role === 'admin')) ? '<button class="btn primary" id="btnDoneWh">完成</button>' : '',
+  ].join('') : '';
 
   const v = view(`
     <div class="doc-hero">
@@ -122,15 +138,17 @@ async function pageDocDetail(q, my) {
           <span>金额 <b>￥${fmt(amount)}</b></span>
           <span>主体 <b>${esc(d.company_name)}</b></span>
           <span>制单 <b>${esc(d.owner_name || '')}</b></span>
+          ${d.type === 'delivery' ? `<span>仓库 <b><span class="badge ${wBadge}">${wLabel}</span></b></span>` : ''}
         </div>
       </div>
       <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-        <select class="input" id="selStatus" style="width:112px">${statusOpts}</select>
-        <button class="btn" id="btnEdit">编辑</button>
+        <select class="input" id="selStatus" style="width:112px" ${canStatus ? '' : 'disabled title="仅制单人可改业务状态"'}>${statusOpts}</select>
+        ${whActions}
+        ${canEdit ? '<button class="btn" id="btnEdit">编辑</button>' : ''}
         <button class="btn primary" id="btnPrint">打印 / PDF</button>
         ${canConvertContract ? '<button class="btn" id="btnToContract">转合同</button>' : ''}
         ${canConvertDelivery ? '<button class="btn" id="btnToDelivery">转送货单</button>' : ''}
-        ${['admin', 'manager'].includes(state.user.role) ? '<button class="btn danger" id="btnDel">删除</button>' : ''}
+        ${canDelete ? '<button class="btn danger" id="btnDel">删除</button>' : ''}
       </div>
     </div>
     <div class="chain">${chain}</div>
@@ -164,15 +182,22 @@ async function pageDocDetail(q, my) {
 
   const go = (h) => { location.hash = h; };
   v.querySelectorAll('[data-go]').forEach((n) => n.onclick = () => go('#/doc?id=' + n.dataset.go));
-  v.querySelector('#btnEdit').onclick = () => go(`#/doc/edit?id=${d.id}`);
+  if (v.querySelector('#btnEdit')) v.querySelector('#btnEdit').onclick = () => go(`#/doc/edit?id=${d.id}`);
   v.querySelector('#btnPrint').onclick = () => go(`#/doc/edit?id=${d.id}&print=1`);
   if (v.querySelector('#btnToContract')) v.querySelector('#btnToContract').onclick = () => convert(d.id, 'contract');
   if (v.querySelector('#btnToDelivery')) v.querySelector('#btnToDelivery').onclick = () => convert(d.id, 'delivery');
-  if (v.querySelector('#btnDel')) v.querySelector('#btnDel').onclick = async () => {
-    if (!await confirmBox('确定删除 ' + d.doc_no + '？删除后不可恢复。', '删除')) return;
-    try { await api('/documents/' + d.id, { method: 'DELETE' }); toast('已删除'); go('#/docs'); } catch (e) { toast(e.message, true); }
+  const whAct = async (action, msg) => {
+    try { await api(`/documents/${d.id}/warehouse`, { method: 'POST', body: { action } }); toast(msg); rerender(); } catch (e) { toast(e.message, true); }
   };
-  v.querySelector('#selStatus').onchange = async (e) => {
+  if (v.querySelector('#btnSendWh')) v.querySelector('#btnSendWh').onclick = async () => { if (await confirmBox('把这张送货单交给仓库处理？仓库可以接收、编辑并打印。')) whAct('send', '已提交仓库，等待接收'); };
+  if (v.querySelector('#btnWithdrawWh')) v.querySelector('#btnWithdrawWh').onclick = async () => { if (await confirmBox('撤回后仓库将看不到这张送货单。')) whAct('withdraw', '已撤回'); };
+  if (v.querySelector('#btnReceiveWh')) v.querySelector('#btnReceiveWh').onclick = () => whAct('receive', '已接收，可编辑和打印');
+  if (v.querySelector('#btnDoneWh')) v.querySelector('#btnDoneWh').onclick = () => whAct('done', '仓库已完成');
+  if (v.querySelector('#btnDel')) v.querySelector('#btnDel').onclick = async () => {
+    if (!await confirmBox('确定删除 ' + d.doc_no + '？单据会移入回收站，30 天内可恢复，到期自动永久删除。', '移入回收站')) return;
+    try { await api('/documents/' + d.id, { method: 'DELETE' }); toast('已移入回收站，30 天内可恢复'); go('#/docs'); } catch (e) { toast(e.message, true); }
+  };
+  if (v.querySelector('#selStatus')) v.querySelector('#selStatus').onchange = async (e) => {
     try {
       await api(`/documents/${d.id}/status`, { method: 'POST', body: { status: e.target.value } });
       toast('状态已更新'); rerender();

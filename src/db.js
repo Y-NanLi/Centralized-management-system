@@ -78,6 +78,13 @@ CREATE TABLE IF NOT EXISTS documents (
   payload TEXT NOT NULL DEFAULT '{}',
   parent_id INTEGER,
   root_id INTEGER,
+  warehouse_status TEXT NOT NULL DEFAULT 'none',
+  warehouse_at TEXT,
+  warehouse_by INTEGER,
+  warehouse_received_at TEXT,
+  warehouse_received_by INTEGER,
+  deleted_at TEXT,
+  deleted_by INTEGER,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -95,6 +102,8 @@ CREATE TABLE IF NOT EXISTS files (
   sha256 TEXT DEFAULT '',
   category TEXT DEFAULT 'other',
   owner_id INTEGER,
+  deleted_at TEXT,
+  deleted_by INTEGER,
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_files_owner ON files(owner_id);
@@ -174,6 +183,24 @@ db.exec('DROP INDEX IF EXISTS idx_products_name_spec');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_owner_name ON customers(created_by, name)');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_products_owner_name_spec ON products(owner_id, name, spec)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_products_owner ON products(owner_id)');
+
+/* ---------- v1.8 仓库流转 / 回收站迁移 ---------- */
+function ensureColumn(table, column, ddl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+ensureColumn('documents', 'warehouse_status', "warehouse_status TEXT NOT NULL DEFAULT 'none'");
+ensureColumn('documents', 'warehouse_at', 'warehouse_at TEXT');
+ensureColumn('documents', 'warehouse_by', 'warehouse_by INTEGER');
+ensureColumn('documents', 'warehouse_received_at', 'warehouse_received_at TEXT');
+ensureColumn('documents', 'warehouse_received_by', 'warehouse_received_by INTEGER');
+ensureColumn('documents', 'deleted_at', 'deleted_at TEXT');
+ensureColumn('documents', 'deleted_by', 'deleted_by INTEGER');
+ensureColumn('files', 'deleted_at', 'deleted_at TEXT');
+ensureColumn('files', 'deleted_by', 'deleted_by INTEGER');
+db.exec('CREATE INDEX IF NOT EXISTS idx_documents_warehouse ON documents(warehouse_status)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_documents_deleted ON documents(deleted_at)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(deleted_at)');
 
 export function all(sql, ...params) {
   return db.prepare(sql).all(...params).map((r) => ({ ...r }));

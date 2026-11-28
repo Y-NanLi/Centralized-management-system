@@ -8,6 +8,8 @@ import { register as docRoutes } from './routes/documents.js';
 import { register as fileRoutes } from './routes/files.js';
 import { register as dashRoutes } from './routes/dashboard.js';
 import { register as importRoutes } from './routes/import.js';
+import { register as warehouseRoutes } from './routes/warehouse.js';
+import { register as recycleRoutes } from './routes/recycle.js';
 
 const router = new Router();
 authRoutes(router);
@@ -17,6 +19,8 @@ docRoutes(router);
 fileRoutes(router);
 dashRoutes(router);
 importRoutes(router);
+warehouseRoutes(router);
+recycleRoutes(router);
 setRouter(router);
 
 function readBody(req) {

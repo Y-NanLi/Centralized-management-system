@@ -18,7 +18,7 @@ async function pageFiles(q, my) {
       <div class="info"><b title="${esc(f.name)}">${esc(f.name)}</b><span>${(f.size / 1024).toFixed(0)} KB · ${esc(f.created_at.slice(0, 10))}${f.doc_count ? ' · 关联 ' + f.doc_count : ''}${showOwner ? ' · ' + esc(f.owner_name || f.owner_username || '—') : ''}</span></div>
       <div class="acts"><a class="btn sm" href="/api/files/${f.id}/raw?token=${encodeURIComponent(state.token)}" target="_blank">查看</a>
         <a class="btn sm" href="/api/files/${f.id}/download?token=${encodeURIComponent(state.token)}">下载</a>
-        ${['admin', 'manager'].includes(state.user.role) ? `<button class="btn sm danger" data-del="${f.id}">删除</button>` : ''}</div>
+        ${(state.user.role === 'admin' || f.owner_id === state.user.id) ? `<button class="btn sm danger" data-del="${f.id}">删除</button>` : ''}</div>
     </div>`;
   }).join('');
   const ownerOpts = state.user.role === 'admin' ? `<select class="input" id="selFileOwner" style="width:150px"><option value="">全部成员</option>${state.owners.map((o) => `<option value="${o.id}" ${String(o.id) === owner ? 'selected' : ''}>${esc(o.display_name)}${o.role === 'guest' ? '（游客）' : ''}</option>`).join('')}</select>` : '';
@@ -53,8 +53,8 @@ async function pageFiles(q, my) {
     input.remove();
   };
   v.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
-    if (!await confirmBox('删除这个文件？')) return;
-    try { await api('/files/' + b.dataset.del, { method: 'DELETE' }); toast('已删除'); rerender(); } catch (e) { toast(e.message, true); }
+    if (!await confirmBox('删除这个文件？文件会移入回收站，30 天内可恢复，到期自动永久删除。', '移入回收站')) return;
+    try { await api('/files/' + b.dataset.del, { method: 'DELETE' }); toast('已移入回收站，30 天内可恢复'); rerender(); } catch (e) { toast(e.message, true); }
   });
   v.querySelector('#fFile').onsubmit = (e) => {
     e.preventDefault();

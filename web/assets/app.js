@@ -8,6 +8,8 @@ import { pagePrint } from './js/print.js';
 import { pageCustomers, pageCustomer } from './js/pages/customers.js';
 import { pageProducts } from './js/pages/products.js';
 import { pageFiles } from './js/pages/files.js';
+import { pageWarehouse } from './js/pages/warehouse.js';
+import { pageRecycle } from './js/pages/recycle.js';
 import { pageUsers } from './js/pages/users.js';
 import { pageSettings } from './js/pages/settings.js';
 
@@ -22,6 +24,8 @@ const routes = {
   '/customer': pageCustomer,
   '/products': pageProducts,
   '/files': pageFiles,
+  '/warehouse': pageWarehouse,
+  '/recycle': pageRecycle,
   '/users': pageUsers,
   '/settings': pageSettings,
 };

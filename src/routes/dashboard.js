@@ -8,7 +8,7 @@ function monthKey(d = new Date()) {
 export function register(router) {
   router.get('/api/dashboard', (ctx) => {
     const owner = requestedOwner(ctx.user, ctx.query);
-    const own = owner ? ' AND d.owner_id=?' : '';
+    const own = ' AND d.deleted_at IS NULL' + (owner ? ' AND d.owner_id=?' : '');
     const p = owner ? [owner] : [];
     const thisMonth = monthKey();
     const counts = Object.fromEntries(['quote', 'contract', 'delivery'].map((t) => [t,
@@ -41,11 +41,11 @@ export function register(router) {
     const tasks = {
       quote_no_contract: all(`SELECT d.id,d.doc_no,d.doc_date,d.amount,c.name AS customer_name FROM documents d
         LEFT JOIN customers c ON c.id=d.customer_id
-        WHERE d.type='quote' AND d.status<>'closed'${own} AND NOT EXISTS (SELECT 1 FROM documents x WHERE x.parent_id=d.id AND x.type='contract')
+        WHERE d.type='quote' AND d.status<>'closed'${own} AND NOT EXISTS (SELECT 1 FROM documents x WHERE x.parent_id=d.id AND x.type='contract' AND x.deleted_at IS NULL)
         ORDER BY d.id DESC LIMIT 8`, ...p),
       contract_no_delivery: all(`SELECT d.id,d.doc_no,d.doc_date,d.amount,c.name AS customer_name FROM documents d
         LEFT JOIN customers c ON c.id=d.customer_id
-        WHERE d.type='contract' AND d.status IN ('signed','delivering')${own} AND NOT EXISTS (SELECT 1 FROM documents x WHERE x.parent_id=d.id AND x.type='delivery')
+        WHERE d.type='contract' AND d.status IN ('signed','delivering')${own} AND NOT EXISTS (SELECT 1 FROM documents x WHERE x.parent_id=d.id AND x.type='delivery' AND x.deleted_at IS NULL)
         ORDER BY d.id DESC LIMIT 8`, ...p),
     };
 
@@ -64,7 +64,7 @@ export function register(router) {
       month: thisMonth, counts, amount, status, recent, trend, tasks, top_customers: topCustomers,
       customers: get(`SELECT COUNT(*) AS c FROM customers${owner ? ' WHERE created_by=?' : ''}`, ...(owner ? [owner] : [])).c,
       products: get(`SELECT COUNT(*) AS c FROM products${owner ? ' WHERE owner_id=?' : ''}`, ...(owner ? [owner] : [])).c,
-      files: get(`SELECT COUNT(*) AS c FROM files${owner ? ' WHERE owner_id=?' : ''}`, ...(owner ? [owner] : [])).c,
+      files: get(`SELECT COUNT(*) AS c FROM files WHERE deleted_at IS NULL${owner ? ' AND owner_id=?' : ''}`, ...(owner ? [owner] : [])).c,
     };
   });
 }
