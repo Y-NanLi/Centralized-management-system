@@ -9,6 +9,7 @@ export const FILES_DIR = path.join(DATA_DIR, 'files');
 export const WEB_DIR = path.join(ROOT, 'web');
 export const PORT = Number(process.env.PORT || 8099);
 export const HOST = process.env.HOST || '0.0.0.0';
+export const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 
 fs.mkdirSync(FILES_DIR, { recursive: true });
 

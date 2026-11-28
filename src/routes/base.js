@@ -3,6 +3,7 @@ import { audit } from '../auth.js';
 import { bad, notFound, str, num, nowISO } from '../util.js';
 import { saveUpload, peekNextNo, STATUSES, TYPE_LABEL } from '../service.js';
 import { assertOwner, requestedOwner } from '../scope.js';
+import { APP_VERSION } from '../config.js';
 
 export function register(router) {
   /* ---------- 游客公开信息（不含电子章与文件） ---------- */
@@ -14,6 +15,7 @@ export function register(router) {
   /* ---------- 元数据 ---------- */
   router.get('/api/meta', () => ({
     types: Object.entries(TYPE_LABEL).map(([key, label]) => ({ key, label })),
+    version: APP_VERSION,
     statuses: Object.fromEntries(Object.entries(STATUSES).map(([k, v]) => [k, v.map(([key, label]) => ({ key, label }))])),
     roles: [
       { key: 'admin', label: '管理员' },

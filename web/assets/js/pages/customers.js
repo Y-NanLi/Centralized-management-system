@@ -18,13 +18,16 @@ async function pageCustomers(q, my) {
       ${showOwner ? `<td class="tiny">${esc(c.owner_name || c.owner_username || '—')}</td>` : ''}
       <td class="right">${c.doc_count}</td><td class="right">￥${fmt(c.total_amount)}</td>
       <td class="tiny">${esc(c.last_date || '—')}</td>
-      <td class="tiny"><a href="#/customer?id=${c.id}${owner ? '&owner=' + owner : ''}" onclick="event.stopPropagation()">详情</a></td>
+      <td class="tiny right"><a href="#/customer?id=${c.id}${owner ? '&owner=' + owner : ''}" onclick="event.stopPropagation()">详情</a></td>
     </tr>`).join('');
+  const cols = showOwner
+    ? '<colgroup><col style="width:24%"><col style="width:12%"><col style="width:14%"><col style="width:11%"><col style="width:7%"><col style="width:10%"><col style="width:12%"><col style="width:10%"></colgroup>'
+    : '<colgroup><col style="width:28%"><col style="width:14%"><col style="width:16%"><col style="width:8%"><col style="width:11%"><col style="width:12%"><col style="width:11%"></colgroup>';
   const ownerOpts = state.user.role === 'admin' ? `<select class="input" name="owner" style="width:150px"><option value="">全部成员</option>${state.owners.map((o) => `<option value="${o.id}" ${String(o.id) === owner ? 'selected' : ''}>${esc(o.display_name)}${o.role === 'guest' ? '（游客）' : ''}</option>`).join('')}</select>` : '';
   const v = view(`<div class="page-head"><div><h2>${owner ? '成员客户档案' : '客户档案'}</h2><div class="desc">共 ${list.length} 家 · ${owner ? '管理员查看指定成员的客户' : '每个账号只看自己的客户；开单时填客户名会自动建档'}</div></div>
       ${owner ? '<div class="tiny">正在查看成员客户，新增客户请切回“全部成员”</div>' : '<div class="actions"><button class="btn primary" id="btnAddCust">+ 新增客户</button></div>'}</div>
     <div class="card"><div class="toolbar"><form id="fCust" style="display:flex;gap:8px"><div class="search"><input class="input" name="q" value="${esc(kw)}" placeholder="名称 / 联系人 / 电话 / 地址"></div>${ownerOpts}<button class="btn">搜索</button></form></div>
-      <table class="tb"><thead><tr><th>客户名称</th><th>联系人</th><th>电话</th>${showOwner ? '<th>归属人</th>' : ''}<th class="right">单据数</th><th class="right">累计金额</th><th>最近单据</th><th></th></tr></thead>
+      <table class="tb" style="table-layout:fixed">${cols}<thead><tr><th>客户名称</th><th>联系人</th><th>电话</th>${showOwner ? '<th>归属人</th>' : ''}<th class="right">单据数</th><th class="right">累计金额</th><th>最近单据</th><th class="right">操作</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="${showOwner ? 8 : 7}"><div class="empty"><b>还没有客户</b>新建单据时填客户名会自动建档</div></td></tr>`}</tbody></table></div>`, 'customers', '客户档案');
 
   v.querySelectorAll('tr[data-id]').forEach((tr) => tr.onclick = () => { location.hash = '#/customer?id=' + tr.dataset.id + (owner ? '&owner=' + owner : ''); });
