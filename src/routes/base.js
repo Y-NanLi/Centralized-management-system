@@ -1,6 +1,6 @@
 import { all, get, run } from '../db.js';
 import { audit } from '../auth.js';
-import { bad, notFound, str, num, nowISO } from '../util.js';
+import { bad, notFound, forbidden, str, num, nowISO } from '../util.js';
 import { saveUpload, peekNextNo, STATUSES, TYPE_LABEL } from '../service.js';
 import { assertOwner, requestedOwner } from '../scope.js';
 import { APP_VERSION } from '../config.js';
@@ -130,7 +130,8 @@ export function register(router) {
   /* ---------- 货品 ---------- */
   router.get('/api/products', (ctx) => {
     const q = String(ctx.query.get('q') || '').trim();
-    const owner = requestedOwner(ctx.user, ctx.query);
+    // 货品库全系统共享；管理员仍可按创建人筛选，普通账号始终看全量
+    const owner = ctx.user.role === 'admin' ? requestedOwner(ctx.user, ctx.query) : null;
     const where = [];
     const params = [];
     if (owner) { where.push('p.owner_id=?'); params.push(owner); }
@@ -148,7 +149,7 @@ export function register(router) {
     const name = str(ctx.body.name, 120);
     if (!name) throw bad('品名不能为空');
     const spec = str(ctx.body.spec, 120);
-    if (get('SELECT id FROM products WHERE name=? AND spec=? AND owner_id=?', name, spec, ctx.user.id)) throw bad('同品名同型号已存在');
+    if (get('SELECT id FROM products WHERE name=? AND spec=? LIMIT 1', name, spec)) throw bad('同品名同型号已存在');
     const id = run('INSERT INTO products (name,spec,unit,price,note,owner_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
       name, spec, str(ctx.body.unit, 20), num(ctx.body.price), str(ctx.body.note, 200),
       ctx.user.id, new Date().toISOString(), new Date().toISOString()).lastId;
@@ -159,10 +160,10 @@ export function register(router) {
     const id = Number(ctx.params.id);
     const p = get('SELECT * FROM products WHERE id=?', id);
     if (!p) throw notFound('货品不存在');
-    assertOwner(ctx.user, p);
+    if (Number(p.owner_id) !== Number(ctx.user.id)) throw forbidden('只能修改自己创建的货品');
     const name = str(ctx.body.name, 120) || p.name;
     const spec = str(ctx.body.spec, 120);
-    const dup = get('SELECT id FROM products WHERE name=? AND spec=? AND owner_id=? AND id<>?', name, spec, p.owner_id, id);
+    const dup = get('SELECT id FROM products WHERE name=? AND spec=? AND id<>?', name, spec, id);
     if (dup) throw bad('同品名同型号已存在');
     run('UPDATE products SET name=?, spec=?, unit=?, price=?, note=?, updated_at=? WHERE id=?',
       name, spec, str(ctx.body.unit, 20), num(ctx.body.price), str(ctx.body.note, 200), new Date().toISOString(), id);
@@ -173,10 +174,10 @@ export function register(router) {
     const id = Number(ctx.params.id);
     const p = get('SELECT * FROM products WHERE id=?', id);
     if (!p) throw notFound('货品不存在');
-    assertOwner(ctx.user, p);
+    if (Number(p.owner_id) !== Number(ctx.user.id)) throw forbidden('只能删除自己创建的货品');
     run('DELETE FROM products WHERE id=?', id);
     return { ok: true };
-  }, { roles: ['admin', 'manager'] });
+  });
 
   /* ---------- 数据导出 ---------- */
   router.get('/api/export/backup', (ctx) => {

@@ -11,18 +11,27 @@ async function pageProducts(q, my) {
   if (owner) params.set('owner', owner);
   const list = await api('/products' + (params.toString() ? '?' + params.toString() : ''));
   if (my !== seq) return;
-  const showOwner = state.user.role === 'admin' && !owner;
-  const rows = list.map((p) => `<tr>
+  const cols = '<colgroup><col style="width:24%"><col style="width:16%"><col style="width:8%"><col style="width:12%"><col style="width:18%"><col style="width:10%"><col style="width:12%"></colgroup>';
+  const rows = list.map((p) => {
+    const mine = Number(p.owner_id) === Number(state.user.id);
+    return `<tr>
       <td><b>${esc(p.name)}</b></td><td class="mono">${esc(p.spec || '—')}</td><td>${esc(p.unit || '—')}</td>
       <td class="right">￥${fmt(p.price)}</td><td class="tiny">${esc(p.note || '')}</td>
-      ${showOwner ? `<td class="tiny">${esc(p.owner_name || p.owner_username || '—')}</td>` : ''}
-      <td class="tiny nowrap"><a href="#" data-edit="${p.id}">编辑</a></td></tr>`).join('');
+      <td class="tiny">${esc(p.owner_name || p.owner_username || '—')}</td>
+      <td class="tiny nowrap right">${mine
+        ? `<a href="#" data-edit="${p.id}">编辑</a> <a href="#" data-del="${p.id}" style="color:#c0392b;margin-left:8px">删除</a>`
+        : '<span class="muted">只读</span>'}</td>
+    </tr>`;
+  }).join('');
   const ownerOpts = state.user.role === 'admin' ? `<select class="input" name="owner" style="width:150px"><option value="">全部成员</option>${state.owners.map((o) => `<option value="${o.id}" ${String(o.id) === owner ? 'selected' : ''}>${esc(o.display_name)}${o.role === 'guest' ? '（游客）' : ''}</option>`).join('')}</select>` : '';
-  const v = view(`<div class="page-head"><div><h2>${owner ? '成员货品库' : '货品库'}</h2><div class="desc">共 ${list.length} 条 · ${owner ? '管理员查看指定成员的货品' : '每个账号只看自己的货品；开单时输规格即可带出品名与单价'}</div></div>
+  const desc = owner
+    ? '管理员查看指定成员创建的货品'
+    : '全系统共享；只能修改或删除自己创建的货品，开单时输规格即可带出品名与单价';
+  const v = view(`<div class="page-head"><div><h2>${owner ? '成员货品库' : '货品库'}</h2><div class="desc">共 ${list.length} 条 · ${desc}</div></div>
       ${owner ? '<div class="tiny">正在查看成员货品，新增货品请切回“全部成员”</div>' : '<div class="actions"><button class="btn primary" id="btnAddProd">+ 新增货品</button></div>'}</div>
     <div class="card"><div class="toolbar"><form id="fProd" style="display:flex;gap:8px"><div class="search"><input class="input" name="q" value="${esc(kw)}" placeholder="品名 / 规格"></div>${ownerOpts}<button class="btn">搜索</button></form></div>
-      <table class="tb"><thead><tr><th>品名</th><th>规格型号</th><th>单位</th><th class="right">参考单价</th><th>备注</th>${showOwner ? '<th>归属人</th>' : ''}<th></th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="${showOwner ? 7 : 6}"><div class="empty"><b>货品库是空的</b>开单时明细填齐会自动入库，也可以在这里手动添加</div></td></tr>`}</tbody></table></div>`, 'products', '货品库');
+      <table class="tb" style="table-layout:fixed">${cols}<thead><tr><th>品名</th><th>规格型号</th><th>单位</th><th class="right">参考单价</th><th>备注</th><th>创建人</th><th class="right">操作</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="7"><div class="empty"><b>货品库是空的</b>开单时明细填齐会自动入库，也可以在这里手动添加</div></td></tr>`}</tbody></table></div>`, 'products', '货品库');
   v.querySelector('#fProd').onsubmit = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -36,6 +45,17 @@ async function pageProducts(q, my) {
   v.querySelectorAll('[data-edit]').forEach((a) => a.onclick = (e) => {
     e.preventDefault();
     productForm(list.find((x) => String(x.id) === a.dataset.edit));
+  });
+  v.querySelectorAll('[data-del]').forEach((a) => a.onclick = async (e) => {
+    e.preventDefault();
+    const p = list.find((x) => String(x.id) === a.dataset.del);
+    if (!p || !confirm('删除货品「' + p.name + '」？')) return;
+    try {
+      await api('/products/' + p.id, { method: 'DELETE' });
+      state.products = await api('/products');
+      toast('已删除');
+      rerender();
+    } catch (err) { toast(err.message, true); }
   });
 }
 

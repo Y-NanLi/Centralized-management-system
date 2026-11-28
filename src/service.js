@@ -82,13 +82,15 @@ export function saveProducts(items = [], unitDefault = '', ownerId = null) {
     const spec = str(it.spec, 120);
     const unit = str(it.unit, 20) || str(unitDefault, 20);
     const price = money(it.price);
-    const old = get('SELECT id FROM products WHERE name=? AND spec=? AND owner_id=?', name, spec, owner);
-    if (old) {
+    // 货品库全系统共享：同品名同型号只保留一条；别人的货品不自动改价，只有本人创建的才更新
+    const own = owner ? get('SELECT id, owner_id FROM products WHERE name=? AND spec=? AND owner_id=? LIMIT 1', name, spec, owner) : null;
+    const any = own || get('SELECT id, owner_id FROM products WHERE name=? AND spec=? ORDER BY id LIMIT 1', name, spec);
+    if (own) {
       if (price > 0 || unit) {
         run('UPDATE products SET price=CASE WHEN ?>0 THEN ? ELSE price END, unit=CASE WHEN length(?)>0 THEN ? ELSE unit END, updated_at=? WHERE id=?',
-          price, price, unit, unit, nowISO(), old.id);
+          price, price, unit, unit, nowISO(), own.id);
       }
-    } else if (price > 0 || unit) {
+    } else if (!any && (price > 0 || unit)) {
       run('INSERT INTO products (name,spec,unit,price,owner_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
         name, spec, unit, price, owner, nowISO(), nowISO());
     }

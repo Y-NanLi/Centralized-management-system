@@ -87,6 +87,7 @@ select.input{appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmln
 
 table.tb{width:100%;border-collapse:collapse;font-size:13px}
 table.tb th{text-align:left;font-weight:600;color:#5b687c;font-size:12px;letter-spacing:.4px;padding:10px 10px;border-bottom:1px solid var(--line);background:#fafbfd;white-space:nowrap}
+table.tb th.right,table.tb td.right{text-align:right}
 table.tb td{padding:10px;border-bottom:1px solid #eef2f7;vertical-align:middle}
 table.tb tr:hover td{background:#fafcff}
 table.tb tr.clickable{cursor:pointer}

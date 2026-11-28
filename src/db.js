@@ -181,7 +181,8 @@ if (fallbackOwner) {
 db.exec('DROP INDEX IF EXISTS idx_customers_name');
 db.exec('DROP INDEX IF EXISTS idx_products_name_spec');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_owner_name ON customers(created_by, name)');
-db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_products_owner_name_spec ON products(owner_id, name, spec)');
+db.exec('DROP INDEX IF EXISTS idx_products_owner_name_spec');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_products_name_spec ON products(name, spec)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_products_owner ON products(owner_id)');
 
 /* ---------- v1.8 仓库流转 / 回收站迁移 ---------- */
