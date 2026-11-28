@@ -20,7 +20,8 @@ async function pageSettings(q, my) {
       <div class="tiny" style="margin-top:10px;line-height:1.9">系统已改为免密码登录，凭用户名识别身份。用户名支持中文、字母、数字、下划线、点或短横；新用户可在登录页自助注册。<br>
       普通账号只能看到自己的工作台、客户、货品、单据和文件；管理员可查看全部成员，并在工作台按成员切换。<br>
       v1.8 新增“仓库”角色：业务员可把送货单交仓库，仓库接收后编辑、打印、完成；删除的单据和文件进入回收站保留 30 天，到期自动永久删除。<br>
-      v1.8.1 送货单默认三联纸 214.7×139.8mm，货物明细默认 7 列：序号、存货编号、存货名称、规格型号、单位、数量、项目编号；仓库账号只显示仓库打单，业务员隐藏系统设置和用户管理，接收/编辑/完成仅仓库账号操作。</div>
+      v1.8.1 送货单默认三联纸 214.7×139.8mm，货物明细默认 7 列：序号、存货编号、存货名称、规格型号、单位、数量、项目编号；仓库账号只显示仓库打单，业务员隐藏系统设置和用户管理，接收/编辑/完成仅仓库账号操作。<br>
+      v1.8.2 增加 GitHub tag 自动构建 Docker 镜像和飞牛 Watchtower 自动更新配置。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
@@ -29,7 +30,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">集中管理系统 v1.8.1 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">集中管理系统 v1.8.2 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 
