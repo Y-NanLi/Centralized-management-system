@@ -91,6 +91,7 @@ async function pageDocDetail(q, my) {
   const id = q.get('id');
   if (!id) { location.hash = '#/docs'; return; }
   const d = await api('/documents/' + id);
+  const chainData = await api('/documents/' + id + '/chain');
   if (my !== seq) return;
   const p = d.payload || {};
   const items = p.items || [];
@@ -101,10 +102,8 @@ async function pageDocDetail(q, my) {
       <td class="c">${esc(it.qty)}</td>${d.type === 'delivery' ? `<td class="c">${esc(it.unit || '')}</td>` : `<td class="right">￥${fmt(it.price)}</td><td class="right">￥${fmt((Number(it.qty) || 0) * (Number(it.price) || 0))}</td>`}
     </tr>`).join('');
 
-  const chainNodes = [];
-  if (d.parent) chainNodes.push(d.parent);
-  chainNodes.push({ id: d.id, doc_no: d.doc_no, type: d.type, status: d.status, on: true });
-  d.children.forEach((c) => chainNodes.push(c));
+  const chainNodes = (chainData.nodes || []).map((n) => ({ ...n, on: Number(n.id) === Number(d.id) }));
+  if (!chainNodes.length) chainNodes.push({ id: d.id, doc_no: d.doc_no, type: d.type, status: d.status, on: true });
   const chain = chainNodes.map((n, i) => `${i ? '<span class="arrow">→</span>' : ''}
       <div class="node ${n.on ? 'on' : ''}" data-go="${n.id}">${typeLabel(n.type)}<span class="n">${esc(n.doc_no)}</span></div>`).join('')
     || '<span class="tiny">此单据还没有上下游关联</span>';
