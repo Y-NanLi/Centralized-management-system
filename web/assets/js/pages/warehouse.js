@@ -47,7 +47,9 @@ async function pageWarehouse(q, my) {
   const pages = Math.max(1, Math.ceil(data.total / data.page_size));
   const tabHref = (s) => '#/warehouse?' + new URLSearchParams({ ...(s ? { status: s } : {}), ...(kw ? { q: kw } : {}) }).toString();
   const v = view(`
-    <div class="page-head"><div><h2>仓库打单</h2><div class="desc">${isWh ? '业务员提交送货单后，在这里接收、编辑、打印并完成；接收前业务员可撤回' : '管理员只读查看仓库队列；接收、编辑、打印和完成由仓库账号操作'}</div></div></div>
+    <div class="page-head"><div><h2>仓库打单</h2><div class="desc">${isWh ? '业务员提交送货单后，在这里接收、编辑、打印并完成；也可以不接收，直接手动新建送货单' : '管理员只读查看仓库队列；接收、编辑、打印和完成由仓库账号操作'}</div></div>
+      ${isWh ? '<button class="btn primary" id="btnNewWh" type="button">＋ 新建送货单</button>' : ''}
+    </div>
     <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
       <div class="stat"><div class="k">待接收</div><div class="v">${data.stats.pending}</div><div class="s">其他用户刚提交的送货单</div><div class="bar"></div></div>
       <div class="stat"><div class="k">处理中</div><div class="v">${data.stats.received}</div><div class="s">已接收，可编辑和打印</div><div class="bar"></div></div>
@@ -79,6 +81,7 @@ async function pageWarehouse(q, my) {
     if (qv) np.set('q', qv);
     location.hash = '#/warehouse?' + np.toString();
   };
+  if (v.querySelector('#btnNewWh')) v.querySelector('#btnNewWh').onclick = () => { location.hash = '#/doc/new?type=delivery'; };
   v.querySelectorAll('[data-receive]').forEach((b) => b.onclick = async () => {
     try {
       await api(`/documents/${b.dataset.receive}/warehouse`, { method: 'POST', body: { action: 'receive' } });

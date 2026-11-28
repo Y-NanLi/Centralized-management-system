@@ -22,7 +22,8 @@ async function pageSettings(q, my) {
       v1.8 新增“仓库”角色：业务员可把送货单交仓库，仓库接收后编辑、打印、完成；删除的单据和文件进入回收站保留 30 天，到期自动永久删除。<br>
       v1.8.1 送货单默认三联纸 214.7×139.8mm，货物明细默认 7 列：序号、存货编号、存货名称、规格型号、单位、数量、项目编号；仓库账号只显示仓库打单，业务员隐藏系统设置和用户管理，接收/编辑/完成仅仓库账号操作。<br>
       v1.8.2 增加 GitHub tag 自动构建 Docker 镜像和飞牛 Watchtower 自动更新配置。<br>
-      v1.8.3 仓库可直接打印待接收送货单，打印时自动接收为“处理中”，编辑与完成权限仍仅限仓库账号。</div>
+      v1.8.3 仓库可直接打印待接收送货单，打印时自动接收为“处理中”，编辑与完成权限仍仅限仓库账号。<br>
+      v1.8.4 仓库可在仓库打单页直接手动新建送货单，无需接收业务员单据；保存后进入“处理中”，但仍不能新建报价单或合同。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
@@ -31,7 +32,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">集中管理系统 v1.8.3 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">集中管理系统 v1.8.4 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 

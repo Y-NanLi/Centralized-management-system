@@ -99,6 +99,12 @@ export function register(router) {
       title: body.title, remark: body.remark, payload, parent_id: body.parent_id, root_id: body.root_id,
       doc_no: body.doc_no,
     }, ctx.user);
+    // 仓库自建送货单不需要等业务员提交或自己“接收”，创建后直接进入处理中
+    if (isWarehouse(ctx.user) && type === 'delivery') {
+      const now = new Date().toISOString();
+      run(`UPDATE documents SET warehouse_status='received', warehouse_received_at=?, warehouse_received_by=?,
+        updated_at=? WHERE id=?`, now, ctx.user.id, now, doc.id);
+    }
     audit(ctx.user.id, 'doc.create', doc.doc_no, `${TYPE_LABEL[doc.type]} ${money(doc.amount)}`, ctx.req.socket.remoteAddress);
     return docDetail(doc.id, ctx.user);
   });

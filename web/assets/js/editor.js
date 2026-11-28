@@ -34,7 +34,7 @@ function blankItem(type) {
 }
 
 async function pageDocNew(q, my) {
-  const type = q.get('type') || 'quote';
+  const type = state.user.role === 'warehouse' ? 'delivery' : (q.get('type') || 'quote');
   const company = state.companies[0];
   const payload = blankPayload(type, company);
   const noPreview = await api(`/number/next?type=${type}&company_id=${company.id}`);

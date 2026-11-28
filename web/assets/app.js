@@ -30,8 +30,8 @@ const routes = {
   '/settings': pageSettings,
 };
 
-/* 仓库账号只保留仓库打单和送货单查看/编辑/打印，其余页面一律回到仓库打单 */
-const WAREHOUSE_ROUTES = new Set(['/warehouse', '/doc', '/doc/edit', '/print']);
+/* 仓库账号保留仓库打单、新建送货单和送货单查看/编辑/打印，其余页面一律回到仓库打单 */
+const WAREHOUSE_ROUTES = new Set(['/warehouse', '/doc/new', '/doc', '/doc/edit', '/print']);
 const SALES_BLOCKED = new Set(['/settings', '/users']);
 const homeHash = (role) => role === 'warehouse' ? '#/warehouse' : '#/dashboard';
 
