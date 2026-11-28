@@ -1,0 +1,43 @@
+# 飞牛 NAS 自动更新版：直接拉取 GitHub Actions 构建的 GHCR 镜像。
+# 首次使用先执行（私有包需要，公开包可跳过）：
+#   echo <PAT> | docker login ghcr.io -u Y-NanLi --password-stdin
+# 然后启动：
+#   docker compose -f docker-compose.ghcr.yml pull
+#   docker compose -f docker-compose.ghcr.yml up -d
+#
+# 注意：本文件的 container_name 与 docker-compose.yml 相同，两个文件不要同时启动。
+services:
+  jizhong:
+    image: ghcr.io/y-nanli/centralized-management-system:latest
+    container_name: jizhong-management
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./data:/app/data
+    labels:
+      # 只允许 Watchtower 更新这个容器，不影响 NAS 上的其他容器
+      com.centurylinklabs.watchtower.enable: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8099/api/public/bootstrap >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: jizhong-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 私有 GHCR 包时取消下面一行注释；先在 NAS 上完成 docker login
+      # - /root/.docker/config.json:/config.json:ro
+    environment:
+      TZ: Asia/Shanghai
+      WATCHTOWER_POLL_INTERVAL: "300"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      # 保留旧镜像，出问题可回滚到上一个版本 tag
+      WATCHTOWER_CLEANUP: "false"

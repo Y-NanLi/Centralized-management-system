@@ -127,6 +127,8 @@ docker compose up -d --build
 
 飞牛 fnOS 逐步部署（源码构建 / 镜像导入、迁移、更新、备份、常见报错）见 [`docs/部署说明.md`](docs/部署说明.md#一docker-部署飞牛-fnos)。
 
+需要“推 tag 自动构建镜像、飞牛自动更新”时，用仓库里的 `.github/workflows/docker-release.yml` + `docker-compose.ghcr.yml`：推 `v*.*.*` tag 后 GitHub Actions 构建双架构镜像到 GHCR，飞牛上的 Watchtower 每 5 分钟检查并拉取新 `latest`。完整步骤见 [`docs/部署说明.md`](docs/部署说明.md#8-github-tag-自动构建--飞牛自动更新可选)。
+
 生产建议在 compose 里固定 `APP_SECRET`（任意长随机串），否则重建容器会让所有人重新登录一次。
 
 ---
@@ -169,8 +171,12 @@ Compress-Archive -Path .\data -DestinationPath "D:\backup\jizhong-$(Get-Date -Fo
 │       ├── app.js              入口：登录、游客身份、路由表
 │       └── js/                 core / shell / editor / print / pages/*
 ├── data/                  运行时数据（不入库）
+├── .github/
+│   └── workflows/
+│       └── docker-release.yml 推送版本 tag 自动构建 GHCR 镜像
 ├── Dockerfile
-├── docker-compose.yml
+├── docker-compose.yml      源码本地构建版
+├── docker-compose.ghcr.yml GHCR 拉取 + Watchtower 自动更新版
 ├── 启动.bat
 ├── docs/系统设计.md        三个旧项目的分析、架构与数据模型说明
 └── docs/部署说明.md        Windows / Docker 部署、更新、迁移与备份
