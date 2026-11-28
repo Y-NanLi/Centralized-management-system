@@ -2,6 +2,7 @@
 import { state, api, esc, fmt, today, typeLabel, toast, modal, cnyUpper, seq } from './core.js';
 import { view } from './shell.js';
 import { sheetHtml } from './print.js';
+import { openTemplateEditor } from './template-editor.js';
 
 /* ---------------- 单据编辑 ---------------- */
 function blankPayload(type, company) {
@@ -40,17 +41,21 @@ async function pageDocNew(q, my) {
   if (my !== seq) return;
   payload.no = noPreview.doc_no;
   if (type === 'delivery' && !payload.maker) payload.maker = state.user.name || state.user.username || '';
-  openEditor({ id: 0, type, payload, status: 'draft', doc_date: today(), doc_no: noPreview.doc_no, title: '', remark: '', company_id: company.id });
+  const ed = { id: 0, type, payload, status: 'draft', doc_date: today(), doc_no: noPreview.doc_no, title: '', remark: '', company_id: company.id };
+  if (!q.get('classic')) { openTemplateEditor(ed); return; }
+  openEditor(ed);
 }
 
 async function pageDocEdit(q, my) {
   const id = q.get('id');
   const d = await api('/documents/' + id);
   if (my !== seq) return;
-  openEditor({
+  const ed = {
     id: d.id, type: d.type, payload: d.payload, status: d.status, doc_date: d.doc_date,
     doc_no: d.doc_no, title: d.title, remark: d.remark, company_id: d.company_id, owner_name: d.owner_name,
-  });
+  };
+  if (!q.get('classic')) { openTemplateEditor(ed, { autoPrint: q.get('print') === '1' }); return; }
+  openEditor(ed);
 }
 
 function openEditor(ed) {

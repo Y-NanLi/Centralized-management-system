@@ -407,3 +407,12 @@ table.tb tr.clickable{cursor:pointer}
   .page-head{flex-direction:column;align-items:stretch}
   .page-head .actions{justify-content:flex-start;flex-wrap:wrap}
 }
+
+/* 独立生成器 iframe 覆盖层 */
+.tpl-overlay{position:fixed;inset:0;z-index:1200;background:#fff}
+.tpl-frame{display:block;width:100%;height:100%;border:0}
+.tpl-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#667085;font-size:14px;transition:opacity .2s}
+.tpl-loading.hide{opacity:0;pointer-events:none}
+.tpl-spin{width:18px;height:18px;border:2px solid #d0d5dd;border-top-color:#2563eb;border-radius:50%;animation:tplSpin .8s linear infinite}
+@keyframes tplSpin{to{transform:rotate(360deg)}}
+

@@ -156,7 +156,7 @@ async function pageDocDetail(q, my) {
   const go = (h) => { location.hash = h; };
   v.querySelectorAll('[data-go]').forEach((n) => n.onclick = () => go('#/doc?id=' + n.dataset.go));
   v.querySelector('#btnEdit').onclick = () => go(`#/doc/edit?id=${d.id}`);
-  v.querySelector('#btnPrint').onclick = () => go(`#/print?id=${d.id}`);
+  v.querySelector('#btnPrint').onclick = () => go(`#/doc/edit?id=${d.id}&print=1`);
   if (v.querySelector('#btnToContract')) v.querySelector('#btnToContract').onclick = () => convert(d.id, 'contract');
   if (v.querySelector('#btnToDelivery')) v.querySelector('#btnToDelivery').onclick = () => convert(d.id, 'delivery');
   if (v.querySelector('#btnDel')) v.querySelector('#btnDel').onclick = async () => {
