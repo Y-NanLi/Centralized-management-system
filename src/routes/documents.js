@@ -5,7 +5,7 @@ import { assertDocumentAccess, assertOwner, isWarehouse, requestedOwner } from '
 import { softDeleteDocument } from '../recycle.js';
 import {
   createDocument, companyById, customerName, docAmount, ensureCustomer,
-  saveProducts, saveUpload, fileById, STATUSES, TYPE_LABEL, defaultPayload,
+  saveProducts, saveUpload, fileById, STATUSES, TYPE_LABEL, defaultPayload, nextAvailableNoFrom,
 } from '../service.js';
 
 function withPayload(row) {
@@ -199,12 +199,16 @@ export function register(router) {
     const src = docDetail(id, ctx.user);
     assertOwner(ctx.user, src);
     const to = ctx.body.to;
+    const mode = ctx.body.mode === 'overwrite' ? 'overwrite' : 'new';
+
     if (to === 'contract' && src.type === 'quote') {
+      const existing = get(`SELECT * FROM documents WHERE parent_id=? AND type='contract' AND deleted_at IS NULL
+        ORDER BY id DESC LIMIT 1`, src.id);
       const q = src.payload;
       const p = defaultPayload('contract', { company: src.company_code ? src.company_code.toLowerCase() : 'jxt' });
       p.company = q.company || p.company;
-      p.date = new Date().toISOString().slice(0, 10);
-      p.no = src.doc_no;
+      p.date = existing && mode === 'overwrite' ? String(existing.doc_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
+      p.no = existing && mode === 'overwrite' ? existing.doc_no : (existing ? nextAvailableNoFrom(src.doc_no, src.company_code) : src.doc_no);
       p.taxRate = q.taxRate == null ? 13 : q.taxRate;
       p.cust = {
         name: q.cust && q.cust.name || src.customer_name || '',
@@ -215,22 +219,38 @@ export function register(router) {
       p.self = Object.assign(p.self, q.self || {});
       p.items = (q.items || []).filter((it) => str(it.name) || str(it.spec));
       p.remark = q.remark || '';
+
+      if (mode === 'overwrite') {
+        if (!existing) throw bad('没有可覆盖的销售合同，请选择另存新合同');
+        run(`UPDATE documents SET company_id=?, customer_id=?, amount=?, tax_rate=?, title=?, remark=?, payload=?, updated_at=? WHERE id=?`,
+          src.company_id, src.customer_id, docAmount(p, 'contract'), num(p.taxRate), `${p.cust.name} 销售合同`, p.remark,
+          JSON.stringify(p), new Date().toISOString(), existing.id);
+        audit(ctx.user.id, 'doc.convert.overwrite', `${src.doc_no} → ${existing.doc_no}`, '覆盖销售合同', ctx.req.socket.remoteAddress);
+        return docDetail(existing.id, ctx.user);
+      }
+
       const doc = createDocument({
         type: 'contract', company_id: src.company_id, customer_id: src.customer_id,
         doc_date: p.date, status: 'draft', payload: p, parent_id: src.id, root_id: src.root_id || src.id,
         title: `${p.cust.name} 销售合同`, remark: p.remark, owner_id: src.owner_id,
-        doc_no: src.doc_no, allow_duplicate_no: true,
+        doc_no: p.no, allow_duplicate_no: !existing,
       }, ctx.user);
-      audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, '报价单转合同', ctx.req.socket.remoteAddress);
+      audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, existing ? '另存销售合同' : '报价单转合同', ctx.req.socket.remoteAddress);
       return docDetail(doc.id, ctx.user);
     }
+
     if (to === 'delivery' && ['contract', 'quote'].includes(src.type)) {
+      const existing = get(`SELECT * FROM documents WHERE parent_id=? AND type='delivery' AND deleted_at IS NULL
+        ORDER BY id DESC LIMIT 1`, src.id);
+      if (mode === 'overwrite' && existing && existing.warehouse_status && existing.warehouse_status !== 'none') {
+        throw bad('已有送货单已进入仓库流程，不能覆盖，请选择另存新单');
+      }
       const q = src.payload;
       const name = (q.cust && q.cust.name) || q.customer || src.customer_name || '';
       const p = defaultPayload('delivery', { company: src.company_code ? src.company_code.toLowerCase() : 'jxt' });
       p.company = q.company || p.company;
-      p.date = new Date().toISOString().slice(0, 10);
-      p.no = src.doc_no;
+      p.date = existing && mode === 'overwrite' ? String(existing.doc_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
+      p.no = existing && mode === 'overwrite' ? existing.doc_no : (existing ? nextAvailableNoFrom(src.doc_no, src.company_code) : src.doc_no);
       p.dtype = '送货单';
       p.customer = name;
       p.items = (q.items || []).filter((it) => str(it.name) || str(it.spec)).map((it) => ({
@@ -245,13 +265,23 @@ export function register(router) {
         addr: (q.cust && (q.cust.addr || q.cust.about)) || src.customer_addr || '',
       };
       p.summary = '';
+
+      if (mode === 'overwrite') {
+        if (!existing) throw bad('没有可覆盖的送货单，请选择另存新单');
+        run(`UPDATE documents SET company_id=?, customer_id=?, amount=?, tax_rate=?, title=?, remark=?, payload=?, updated_at=? WHERE id=?`,
+          src.company_id, src.customer_id, docAmount(p, 'delivery'), 0, `${name} 送货单`, '',
+          JSON.stringify(p), new Date().toISOString(), existing.id);
+        audit(ctx.user.id, 'doc.convert.overwrite', `${src.doc_no} → ${existing.doc_no}`, '覆盖送货单', ctx.req.socket.remoteAddress);
+        return docDetail(existing.id, ctx.user);
+      }
+
       const doc = createDocument({
         type: 'delivery', company_id: src.company_id, customer_id: src.customer_id,
         doc_date: p.date, status: 'draft', payload: p, parent_id: src.id, root_id: src.root_id || src.id,
         title: `${name} 送货单`, owner_id: src.owner_id,
-        doc_no: src.doc_no, allow_duplicate_no: true,
+        doc_no: p.no, allow_duplicate_no: !existing,
       }, ctx.user);
-      audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, '转送货单', ctx.req.socket.remoteAddress);
+      audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, existing ? '另存送货单' : '转送货单', ctx.req.socket.remoteAddress);
       return docDetail(doc.id, ctx.user);
     }
     throw bad('不支持这种转换');

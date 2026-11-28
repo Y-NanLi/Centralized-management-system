@@ -46,6 +46,20 @@ export function peekNextNo(companyCode) {
   return formatNo(key, nextNoValue(key));
 }
 
+/** 从指定单号往后找第一个没有被占用的编号，如 JXT-20261128001 → 002、003… */
+export function nextAvailableNoFrom(docNo, companyCode) {
+  const m = /^(.+?)(\d{3})$/.exec(String(docNo || '').trim());
+  if (!m) return peekNextNo(companyCode);
+  const key = m[1];
+  let n = Number(m[2]) + 1;
+  let candidate = formatNo(key, n);
+  while (get('SELECT id FROM documents WHERE doc_no=? LIMIT 1', candidate)) {
+    n += 1;
+    candidate = formatNo(key, n);
+  }
+  return candidate;
+}
+
 export function nextNo(_type, companyCode, _subtype) {
   const key = noKey(companyCode);
   const n = nextNoValue(key);

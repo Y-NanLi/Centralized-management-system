@@ -1,5 +1,5 @@
 /* 单据列表与详情 */
-import { state, api, esc, fmt, typeLabel, statusLabel, fileUrl, toast, confirmBox, cnyUpper, seq, rerender } from '../core.js';
+import { state, api, esc, fmt, typeLabel, statusLabel, fileUrl, toast, confirmBox, cnyUpper, modal, seq, rerender } from '../core.js';
 import { view } from '../shell.js';
 
 /* ---------------- 单据列表 ---------------- */
@@ -104,9 +104,28 @@ async function pageDocDetail(q, my) {
 
   const chainNodes = (chainData.nodes || []).map((n) => ({ ...n, on: Number(n.id) === Number(d.id) }));
   if (!chainNodes.length) chainNodes.push({ id: d.id, doc_no: d.doc_no, type: d.type, status: d.status, on: true });
-  const chain = chainNodes.map((n, i) => `${i ? '<span class="arrow">→</span>' : ''}
-      <div class="node ${n.on ? 'on' : ''}" data-go="${n.id}">${typeLabel(n.type)}<span class="n">${esc(n.doc_no)}</span></div>`).join('')
-    || '<span class="tiny">此单据还没有上下游关联</span>';
+  const chainIds = new Set(chainNodes.map((n) => Number(n.id)));
+  const childMap = new Map();
+  chainNodes.forEach((n) => {
+    const parent = Number(n.parent_id);
+    if (parent && chainIds.has(parent)) {
+      if (!childMap.has(parent)) childMap.set(parent, []);
+      childMap.get(parent).push(n);
+    }
+  });
+  const roots = chainNodes.filter((n) => {
+    const parent = Number(n.parent_id);
+    return !parent || !chainIds.has(parent);
+  }).sort((a, b) => Number(a.id) - Number(b.id));
+  const renderChainNode = (n) => {
+    const kids = (childMap.get(Number(n.id)) || []).sort((a, b) => Number(a.id) - Number(b.id));
+    return `<li><div class="node ${Number(n.id) === Number(d.id) ? 'on' : ''}" data-go="${n.id}">
+        <b>${typeLabel(n.type)}</b><span class="n">${esc(n.doc_no)}</span><span class="st">${statusLabel(n.type, n.status)}</span>
+      </div>${kids.length ? `<ul>${kids.map(renderChainNode).join('')}</ul>` : ''}</li>`;
+  };
+  const chain = roots.length
+    ? `<ul class="chain-tree">${roots.map(renderChainNode).join('')}</ul>`
+    : '<span class="tiny">此单据还没有上下游关联</span>';
 
   const statusOpts = state.meta.statuses[d.type].map((s) => `<option value="${s.key}" ${s.key === d.status ? 'selected' : ''}>${s.label}</option>`).join('');
   const files = d.files.map((f) => fileRow(f)).join('');
@@ -151,7 +170,7 @@ async function pageDocDetail(q, my) {
         ${canDelete ? '<button class="btn danger" id="btnDel">删除</button>' : ''}
       </div>
     </div>
-    <div class="chain">${chain}</div>
+    <div class="chain" style="display:block">${chain}</div>
 
     <div class="card">
       <div class="kv">
@@ -193,8 +212,22 @@ async function pageDocDetail(q, my) {
       go(`#/doc/edit?id=${d.id}&print=1`);
     } catch (e) { toast(e.message, true); }
   };
-  if (v.querySelector('#btnToContract')) v.querySelector('#btnToContract').onclick = () => convert(d.id, 'contract');
-  if (v.querySelector('#btnToDelivery')) v.querySelector('#btnToDelivery').onclick = () => convert(d.id, 'delivery');
+  const startConvert = (to) => {
+    const existing = chainNodes.filter((n) => Number(n.parent_id) === Number(d.id) && n.type === to);
+    if (!existing.length) { convert(d.id, to, 'new'); return; }
+    const label = to === 'contract' ? '销售合同' : '送货单';
+    const latest = existing[existing.length - 1];
+    const m = modal({
+      title: `已有${label}`,
+      body: `<p style="margin:0 0 10px;line-height:1.8">这张${typeLabel(d.type)}已经生成过 <b>${existing.length}</b> 张${label}，最近一张编号是 <b>${esc(latest.doc_no)}</b>。</p>
+        <p class="tiny" style="margin:0;line-height:1.8">覆盖：保留原编号，用当前单据内容替换最近一张。<br>另存：保留原${label}，新建一张${label}，编号从当前单据编号往后自动找未占用的编号。</p>`,
+      footer: `<button class="btn" data-close>取消</button><button class="btn" id="convOverwrite">覆盖原${label}</button><button class="btn primary" id="convNew">另存新${label}</button>`,
+    });
+    m.root.querySelector('#convOverwrite').onclick = () => { m.close(); convert(d.id, to, 'overwrite'); };
+    m.root.querySelector('#convNew').onclick = () => { m.close(); convert(d.id, to, 'new'); };
+  };
+  if (v.querySelector('#btnToContract')) v.querySelector('#btnToContract').onclick = () => startConvert('contract');
+  if (v.querySelector('#btnToDelivery')) v.querySelector('#btnToDelivery').onclick = () => startConvert('delivery');
   const whAct = async (action, msg) => {
     try { await api(`/documents/${d.id}/warehouse`, { method: 'POST', body: { action } }); toast(msg); rerender(); } catch (e) { toast(e.message, true); }
   };
@@ -253,10 +286,10 @@ function fileRow(f) {
     </div>`;
 }
 
-async function convert(id, to) {
+async function convert(id, to, mode = 'new') {
   try {
-    const nd = await api(`/documents/${id}/convert`, { method: 'POST', body: { to } });
-    toast('已生成 ' + nd.doc_no);
+    const nd = await api(`/documents/${id}/convert`, { method: 'POST', body: { to, mode } });
+    toast((mode === 'overwrite' ? '已覆盖 ' : '已生成 ') + nd.doc_no);
     location.hash = '#/doc?id=' + nd.id;
   } catch (e) { toast(e.message, true); }
 }
