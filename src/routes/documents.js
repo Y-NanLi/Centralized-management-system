@@ -242,6 +242,9 @@ export function register(router) {
     if (to === 'delivery' && ['contract', 'quote'].includes(src.type)) {
       const existing = get(`SELECT * FROM documents WHERE parent_id=? AND type='delivery' AND deleted_at IS NULL
         ORDER BY id DESC LIMIT 1`, src.id);
+      const linked = src.type === 'quote' ? get(`SELECT * FROM documents WHERE root_id=? AND type='delivery' AND deleted_at IS NULL
+        ORDER BY id DESC LIMIT 1`, src.root_id || src.id) : null;
+      const hasAny = !!existing || !!linked;
       if (mode === 'overwrite' && existing && existing.warehouse_status && existing.warehouse_status !== 'none') {
         throw bad('已有送货单已进入仓库流程，不能覆盖，请选择另存新单');
       }
@@ -250,7 +253,7 @@ export function register(router) {
       const p = defaultPayload('delivery', { company: src.company_code ? src.company_code.toLowerCase() : 'jxt' });
       p.company = q.company || p.company;
       p.date = existing && mode === 'overwrite' ? String(existing.doc_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
-      p.no = existing && mode === 'overwrite' ? existing.doc_no : (existing ? nextAvailableNoFrom(src.doc_no, src.company_code) : src.doc_no);
+      p.no = existing && mode === 'overwrite' ? existing.doc_no : (hasAny ? nextAvailableNoFrom(src.doc_no, src.company_code) : src.doc_no);
       p.dtype = '送货单';
       p.customer = name;
       p.items = (q.items || []).filter((it) => str(it.name) || str(it.spec)).map((it) => ({
@@ -279,9 +282,9 @@ export function register(router) {
         type: 'delivery', company_id: src.company_id, customer_id: src.customer_id,
         doc_date: p.date, status: 'draft', payload: p, parent_id: src.id, root_id: src.root_id || src.id,
         title: `${name} 送货单`, owner_id: src.owner_id,
-        doc_no: p.no, allow_duplicate_no: !existing,
+        doc_no: p.no, allow_duplicate_no: !hasAny,
       }, ctx.user);
-      audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, existing ? '另存送货单' : '转送货单', ctx.req.socket.remoteAddress);
+      audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, hasAny ? '另存送货单' : '转送货单', ctx.req.socket.remoteAddress);
       return docDetail(doc.id, ctx.user);
     }
     throw bad('不支持这种转换');

@@ -114,19 +114,30 @@ async function pageDocDetail(q, my) {
     }
   });
   const sortById = (a, b) => Number(a.id) - Number(b.id);
+  const typeOrder = { quote: 0, contract: 1, delivery: 2 };
+  const sortChildren = (a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9) || sortById(a, b);
   const roots = chainNodes.filter((n) => {
     const parent = Number(n.parent_id);
     return !parent || !chainIds.has(parent);
   }).sort(sortById);
   const graphNodes = [];
   let nextRow = 0;
+  const chainTypes = new Set(chainNodes.map((n) => n.type));
+  const contractCol = chainTypes.has('quote') ? 1 : 0;
+  const deliveryCol = chainTypes.has('contract') ? contractCol + 1 : (chainTypes.has('quote') ? 1 : 0);
+  const stageDepth = (n) => {
+    if (n.type === 'quote') return 0;
+    if (n.type === 'contract') return contractCol;
+    if (n.type === 'delivery') return deliveryCol;
+    return n._depth + 1;
+  };
   const layoutNode = (n, depth) => {
-    const kids = (childMap.get(Number(n.id)) || []).sort(sortById);
+    const kids = (childMap.get(Number(n.id)) || []).sort(sortChildren);
     n._depth = depth;
     n._kids = kids;
     graphNodes.push(n);
     if (!kids.length) { n._row = nextRow; nextRow += 1; return; }
-    kids.forEach((k) => layoutNode(k, depth + 1));
+    kids.forEach((k) => layoutNode(k, stageDepth(k)));
     n._row = (kids[0]._row + kids[kids.length - 1]._row) / 2;
   };
   roots.forEach((r, i) => {
@@ -257,7 +268,22 @@ async function pageDocDetail(q, my) {
   };
   const startConvert = (to) => {
     const existing = chainNodes.filter((n) => Number(n.parent_id) === Number(d.id) && n.type === to);
-    if (!existing.length) { convert(d.id, to, 'new'); return; }
+    if (!existing.length) {
+      const linked = d.type === 'quote' && to === 'delivery'
+        ? chainNodes.filter((n) => n.type === 'delivery') : [];
+      if (linked.length) {
+        const m = modal({
+          title: '链路已有送货单',
+          body: `<p style="margin:0 0 10px;line-height:1.8">当前业务链已经有 <b>${linked.length}</b> 张送货单，再生成会多出一张直接挂在报价单下的送货单。</p>
+            <p class="tiny" style="margin:0;line-height:1.8">继续生成时，新送货单会自动使用一个未占用编号，不会重复占用已有单号。</p>`,
+          footer: `<button class="btn" data-close>取消</button><button class="btn primary" id="dupContinue">仍要生成</button>`,
+        });
+        m.root.querySelector('#dupContinue').onclick = () => { m.close(); convert(d.id, to, 'new'); };
+        return;
+      }
+      convert(d.id, to, 'new');
+      return;
+    }
     const label = to === 'contract' ? '销售合同' : '送货单';
     const latest = existing[existing.length - 1];
     const m = modal({

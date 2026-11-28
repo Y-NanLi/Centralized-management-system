@@ -35,7 +35,8 @@ async function pageSettings(q, my) {
       v1.9.6 客户档案新增多行备注和客户附件，可记录付款方式、账期、成本加点，并上传付款资料、客户信息、合同扫描件。<br>
       v1.9.7 增加窄窗口与手机端适配：顶部横向导航、表格横向滑动不挤压；单据编辑器手机端上下排列，录入和预览都可正常使用。<br>
       v1.9.8 转合同/转送货单时，如果已有下游单据会提示“覆盖原单 / 另存新单”；另存自动递增编号并跳过已占用号码，详情链路改为树状结构。<br>
-      v1.9.9 单据链路改为横向流程图：报价单、销售合同、送货单用圆角卡片和箭头展示，多合同、多送货单按分支排列；手机端使用紧凑卡片。</div>
+      v1.9.9 单据链路改为横向流程图：报价单、销售合同、送货单用圆角卡片和箭头展示，多合同、多送货单按分支排列；手机端使用紧凑卡片。<br>
+      v1.9.10 报价单直转的送货单统一放到第三列；报价单转送货单时检查链路已有送货单并提示，继续生成自动使用未占用编号。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
@@ -44,7 +45,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">CRM系统 v1.9.9 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">CRM系统 v1.9.10 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 
