@@ -24,7 +24,8 @@ async function pageSettings(q, my) {
       v1.8.2 增加 GitHub tag 自动构建 Docker 镜像和飞牛 Watchtower 自动更新配置。<br>
       v1.8.3 仓库可直接打印待接收送货单，打印时自动接收为“处理中”，编辑与完成权限仍仅限仓库账号。<br>
       v1.8.4 仓库可在仓库打单页直接手动新建送货单，无需接收业务员单据；保存后进入“处理中”，但仍不能新建报价单或合同。<br>
-      v1.8.5 仓库打单默认进入“全部”页签，“全部”放在最左侧。</div>
+      v1.8.5 仓库打单默认进入“全部”页签，“全部”放在最左侧。<br>
+      v1.8.6 系统品牌名称改为“CRM系统”。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
@@ -33,7 +34,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">集中管理系统 v1.8.5 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">CRM系统 v1.8.6 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 
@@ -102,7 +103,7 @@ async function pageSettings(q, my) {
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = '集中管理系统备份_' + today() + '.json';
+      a.download = 'CRM系统备份_' + today() + '.json';
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       toast('已导出备份');

@@ -174,7 +174,7 @@
     lastSavedNo = doc.doc_no || docNo;
     localStorage.setItem(META_KEY, JSON.stringify(meta));
     notify('saved', { id: meta.docId, doc_no: meta.docNo, title: meta.title || '', reason: reason || 'save' });
-    say('已保存到集中管理系统：' + (meta.docNo || ''));
+    say('已保存到CRM系统：' + (meta.docNo || ''));
     return true;
   }
 
@@ -263,7 +263,7 @@
     btn.className = 'btn ghost';
     btn.id = 'centralBackBtn';
     btn.textContent = '返回系统';
-    btn.title = '保存后返回集中管理系统';
+    btn.title = '保存后返回CRM系统';
     btn.addEventListener('click', async () => {
       if (btn.dataset.busy === '1') return;
       btn.dataset.busy = '1';
@@ -273,7 +273,7 @@
       const ok = shouldSave ? await push(state, 'close') : true;
       btn.dataset.busy = '0';
       btn.textContent = '返回系统';
-      if (!ok && !confirm('单据保存到集中管理系统失败，仍要返回吗？')) return;
+      if (!ok && !confirm('单据保存到CRM系统失败，仍要返回吗？')) return;
       notify('close', { id: meta.docId || 0 });
     });
     bar.insertBefore(btn, bar.querySelector('#btnNew') || bar.firstElementChild && bar.firstElementChild.nextSibling);

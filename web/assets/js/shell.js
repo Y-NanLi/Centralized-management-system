@@ -36,7 +36,7 @@ function renderShell() {
     <a class="nav-item" data-nav="${n.key}" href="${n.href}"><span class="ic">${n.icon}</span>${n.label}</a>`).join('');
   app.innerHTML = `<div class="shell">
       <aside class="sidebar">
-        <div class="brand"><div class="brand-mark">集</div><div class="brand-text"><b>集中管理系统</b><span>${isWh ? '仓库打单' : '报价 · 合同 · 送货单'}</span></div></div>
+        <div class="brand"><div class="brand-mark">C</div><div class="brand-text"><b>CRM系统</b><span>${isWh ? '仓库打单' : '报价 · 合同 · 送货单'}</span></div></div>
         <nav class="nav">${nav}</nav>
         <div class="userbox">
           <div class="avatar">${esc((state.user.name || state.user.username).slice(0, 1))}</div>

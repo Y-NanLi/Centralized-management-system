@@ -49,7 +49,7 @@ function renderLogin(msg, mode = 'login') {
   document.body.classList.remove('printing');
   const reg = mode === 'register';
   app.innerHTML = `<div class="login-wrap"><form class="login-card" id="loginForm">
-      <div class="login-brand"><div class="login-logo">集</div><div><h1>集中管理系统</h1></div></div>
+      <div class="login-brand"><div class="login-logo">C</div><div><h1>CRM系统</h1></div></div>
       <div class="sub">报价单 · 销售合同 · 送货单 一体化管理</div>
       ${msg ? `<div class="login-err">${esc(msg)}</div>` : ''}
       <div class="field"><label>用户名</label><input class="input" name="username" autocomplete="username" placeholder="支持中文，2–24 位" autofocus></div>
@@ -109,7 +109,7 @@ async function startGuest() {
     toast('临时游客模式：数据只保存在本浏览器对应的游客身份，建议注册账号长期保存');
   } catch (err) {
     app.innerHTML = `<div class="login-wrap"><div class="login-card">
-      <div class="login-brand"><div class="login-logo">集</div><div><h1>集中管理系统</h1></div></div>
+      <div class="login-brand"><div class="login-logo">C</div><div><h1>CRM系统</h1></div></div>
       <div class="sub">无法连接服务器</div>
       <div class="login-err">${esc(err.message)}</div>
     </div></div>`;
