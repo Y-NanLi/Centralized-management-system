@@ -117,6 +117,16 @@ CREATE TABLE IF NOT EXISTS document_files (
   UNIQUE(document_id, file_id)
 );
 
+CREATE TABLE IF NOT EXISTS customer_files (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id INTEGER NOT NULL,
+  file_id INTEGER NOT NULL,
+  category TEXT DEFAULT 'customer',
+  created_at TEXT NOT NULL,
+  UNIQUE(customer_id, file_id)
+);
+CREATE INDEX IF NOT EXISTS idx_customer_files_customer ON customer_files(customer_id);
+
 CREATE TABLE IF NOT EXISTS number_seq (
   key TEXT PRIMARY KEY,
   n INTEGER NOT NULL DEFAULT 0

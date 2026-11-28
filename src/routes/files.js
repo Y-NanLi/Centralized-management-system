@@ -58,8 +58,9 @@ export function register(router) {
     if (row.deleted_at) throw notFound('文件已删除');
     if (!isAdmin(ctx.user) && !isCompanyAsset(id)) assertOwner(ctx.user, row);
     const used = get('SELECT document_id FROM document_files WHERE file_id=? LIMIT 1', id)
+      || get('SELECT customer_id FROM customer_files WHERE file_id=? LIMIT 1', id)
       || get('SELECT id FROM companies WHERE logo_file_id=? OR stamp_file_id=? LIMIT 1', id, id);
-    if (used) throw bad('该文件已被单据或公司主体引用，不能删除');
+    if (used) throw bad('该文件已被单据、客户档案或公司主体引用，不能删除');
     softDeleteFile(id, ctx.user.id);
     return { ok: true, recycled: true };
   });

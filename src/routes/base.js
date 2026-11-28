@@ -1,7 +1,7 @@
 import { all, get, run } from '../db.js';
 import { audit } from '../auth.js';
 import { bad, notFound, forbidden, str, num, nowISO } from '../util.js';
-import { saveUpload, peekNextNo, STATUSES, TYPE_LABEL } from '../service.js';
+import { saveUpload, fileById, peekNextNo, STATUSES, TYPE_LABEL } from '../service.js';
 import { assertOwner, requestedOwner } from '../scope.js';
 import { APP_VERSION } from '../config.js';
 
@@ -98,7 +98,38 @@ export function register(router) {
       quote_count: all("SELECT COUNT(*) AS s FROM documents WHERE customer_id=? AND type='quote' AND deleted_at IS NULL", c.id)[0].s,
       delivery_count: all("SELECT COUNT(*) AS s FROM documents WHERE customer_id=? AND type='delivery' AND deleted_at IS NULL", c.id)[0].s,
     };
-    return { ...c, documents: docs, stats };
+    const files = all(`SELECT f.id,f.name,f.mime,f.size,f.category,cf.created_at
+      FROM customer_files cf JOIN files f ON f.id=cf.file_id
+      WHERE cf.customer_id=? AND f.deleted_at IS NULL ORDER BY f.id DESC`, c.id);
+    return { ...c, documents: docs, stats, files };
+  });
+
+  router.post('/api/customers/:id/files', async (ctx) => {
+    const id = Number(ctx.params.id);
+    const c = get('SELECT * FROM customers WHERE id=?', id);
+    if (!c) throw notFound('客户不存在');
+    assertOwner(ctx.user, c, 'created_by');
+    const form = await ctx.form();
+    const files = (form || []).filter((p) => p.filename);
+    if (!files.length) throw bad('没有收到文件');
+    const added = [];
+    for (const f of files) {
+      const fid = saveUpload(f, c.created_by || ctx.user.id, 'customer');
+      run('INSERT OR IGNORE INTO customer_files (customer_id,file_id,category,created_at) VALUES (?,?,?,?)',
+        id, fid, 'customer', new Date().toISOString());
+      added.push(fileById(fid));
+    }
+    audit(ctx.user.id, 'customer.file', String(id), `${files.length} 个文件`, ctx.req.socket.remoteAddress);
+    return added;
+  });
+
+  router.del('/api/customers/:id/files/:fileId', (ctx) => {
+    const id = Number(ctx.params.id);
+    const c = get('SELECT * FROM customers WHERE id=?', id);
+    if (!c) throw notFound('客户不存在');
+    assertOwner(ctx.user, c, 'created_by');
+    run('DELETE FROM customer_files WHERE customer_id=? AND file_id=?', id, Number(ctx.params.fileId));
+    return { ok: true };
   });
 
   router.post('/api/customers', (ctx) => {
@@ -107,7 +138,7 @@ export function register(router) {
     if (get('SELECT id FROM customers WHERE name=? AND created_by=?', name, ctx.user.id)) throw bad('同名客户已存在');
     const id = run('INSERT INTO customers (name,addr,contact,phone,fax,tax_no,note,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
       name, str(ctx.body.addr, 200), str(ctx.body.contact, 60), str(ctx.body.phone, 60), str(ctx.body.fax, 60),
-      str(ctx.body.tax_no, 60), str(ctx.body.note, 300), ctx.user.id, new Date().toISOString(), new Date().toISOString()).lastId;
+      str(ctx.body.tax_no, 60), str(ctx.body.note, 2000), ctx.user.id, new Date().toISOString(), new Date().toISOString()).lastId;
     audit(ctx.user.id, 'customer.create', 'customer', name, ctx.req.socket.remoteAddress);
     return get('SELECT * FROM customers WHERE id=?', id);
   });
@@ -122,7 +153,7 @@ export function register(router) {
     if (dup) throw bad('已有同名客户');
     run('UPDATE customers SET name=?, addr=?, contact=?, phone=?, fax=?, tax_no=?, note=?, updated_at=? WHERE id=?',
       name, str(ctx.body.addr, 200), str(ctx.body.contact, 60), str(ctx.body.phone, 60), str(ctx.body.fax, 60),
-      str(ctx.body.tax_no, 60), str(ctx.body.note, 300), new Date().toISOString(), id);
+      str(ctx.body.tax_no, 60), str(ctx.body.note, 2000), new Date().toISOString(), id);
     return get('SELECT * FROM customers WHERE id=?', id);
   });
 

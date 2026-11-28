@@ -31,7 +31,8 @@ async function pageSettings(q, my) {
       v1.9.2 货品库改为全系统共享，只能修改或删除自己创建的货品；修正表头与金额右对齐。<br>
       v1.9.3 单据详情显示完整业务链，报价单、合同、送货单三个节点不再互相消失。<br>
       v1.9.4 送货单制单人随仓库流转自动变化：未交仓库显示本人，交仓库后显示“仓库”，仓库接收后显示接收人姓名；经办人显示提交人。<br>
-      v1.9.5 修复客户档案“累计金额”：同一订单的报价、合同不再重复相加，每个订单只计一次，优先取合同金额。</div>
+      v1.9.5 修复客户档案“累计金额”：同一订单的报价、合同不再重复相加，每个订单只计一次，优先取合同金额。<br>
+      v1.9.6 客户档案新增多行备注和客户附件，可记录付款方式、账期、成本加点，并上传付款资料、客户信息、合同扫描件。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
@@ -40,7 +41,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">CRM系统 v1.9.5 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">CRM系统 v1.9.6 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 
