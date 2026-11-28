@@ -29,7 +29,8 @@ async function pageSettings(q, my) {
       v1.9.0 单据编号统一为“公司代码+日期+三位流水”（如 JXT-20261128001），报价、合同、送货单共用当天流水；转换单据继承原编号。<br>
       v1.9.1 侧栏品牌图标改为红色 AC 字母标识，CRM系统下方显示版本号；修复客户档案列表表头与数据错位。<br>
       v1.9.2 货品库改为全系统共享，只能修改或删除自己创建的货品；修正表头与金额右对齐。<br>
-      v1.9.3 单据详情显示完整业务链，报价单、合同、送货单三个节点不再互相消失。</div>
+      v1.9.3 单据详情显示完整业务链，报价单、合同、送货单三个节点不再互相消失。<br>
+      v1.9.4 送货单制单人随仓库流转自动变化：未交仓库显示本人，交仓库后显示“仓库”，仓库接收后显示接收人姓名；经办人显示提交人。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
@@ -38,7 +39,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">CRM系统 v1.9.3 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">CRM系统 v1.9.4 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 

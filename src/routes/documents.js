@@ -19,15 +19,34 @@ function withPayload(row) {
 function docDetail(id, user) {
   const d = get(`SELECT d.*, c.name AS customer_name, c.addr AS customer_addr, c.contact AS customer_contact,
       c.phone AS customer_phone, c.fax AS customer_fax, co.code AS company_code, co.name AS company_name,
-      u.name AS owner_name, u.role AS owner_role
+      u.name AS owner_name, u.role AS owner_role,
+      wu.name AS warehouse_by_name, wu.username AS warehouse_by_username,
+      ru.name AS warehouse_received_by_name, ru.username AS warehouse_received_by_username
     FROM documents d
     LEFT JOIN customers c ON c.id=d.customer_id
     LEFT JOIN companies co ON co.id=d.company_id
     LEFT JOIN users u ON u.id=d.owner_id
+    LEFT JOIN users wu ON wu.id=d.warehouse_by
+    LEFT JOIN users ru ON ru.id=d.warehouse_received_by
     WHERE d.id=? AND d.deleted_at IS NULL`, id);
   if (!d) throw notFound('单据不存在');
   assertDocumentAccess(user, d);
   const out = withPayload(d);
+  // 送货单：未交仓库时制单人是自己；交仓库后显示“仓库”，仓库接收后显示接收人姓名；经办人是交单人
+  if (out.type === 'delivery') {
+    const p = out.payload;
+    const owner = out.owner_name || out.owner_username || '';
+    const w = out.warehouse_status || 'none';
+    if (w === 'none') {
+      p.maker = owner;
+    } else if (w === 'pending') {
+      p.maker = '仓库';
+    } else {
+      p.maker = out.warehouse_received_by_name || out.warehouse_received_by_username || '仓库';
+    }
+    const sender = out.warehouse_by_name || out.warehouse_by_username;
+    if (sender) p.agent = sender;
+  }
   out.files = all(`SELECT f.id,f.name,f.mime,f.size,f.category,df.category AS link_category,df.created_at
     FROM document_files df JOIN files f ON f.id=df.file_id
     WHERE df.document_id=? AND f.deleted_at IS NULL ORDER BY df.id DESC`, id);

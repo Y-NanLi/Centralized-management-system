@@ -40,7 +40,10 @@ async function pageDocNew(q, my) {
   const noPreview = await api(`/number/next?type=${type}&company_id=${company.id}`);
   if (my !== seq) return;
   payload.no = noPreview.doc_no;
-  if (type === 'delivery' && !payload.maker) payload.maker = state.user.name || state.user.username || '';
+  if (type === 'delivery') {
+    payload.maker = state.user.name || state.user.username || '';
+    payload.agent = '';
+  }
   const ed = { id: 0, type, payload, status: 'draft', doc_date: today(), doc_no: noPreview.doc_no, title: '', remark: '', company_id: company.id };
   if (!q.get('classic')) { openTemplateEditor(ed); return; }
   openEditor(ed);
