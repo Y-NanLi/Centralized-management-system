@@ -113,19 +113,62 @@ async function pageDocDetail(q, my) {
       childMap.get(parent).push(n);
     }
   });
+  const sortById = (a, b) => Number(a.id) - Number(b.id);
   const roots = chainNodes.filter((n) => {
     const parent = Number(n.parent_id);
     return !parent || !chainIds.has(parent);
-  }).sort((a, b) => Number(a.id) - Number(b.id));
-  const renderChainNode = (n) => {
-    const kids = (childMap.get(Number(n.id)) || []).sort((a, b) => Number(a.id) - Number(b.id));
-    return `<li><div class="node ${Number(n.id) === Number(d.id) ? 'on' : ''}" data-go="${n.id}">
-        <b>${typeLabel(n.type)}</b><span class="n">${esc(n.doc_no)}</span><span class="st">${statusLabel(n.type, n.status)}</span>
-      </div>${kids.length ? `<ul>${kids.map(renderChainNode).join('')}</ul>` : ''}</li>`;
+  }).sort(sortById);
+  const graphNodes = [];
+  let nextRow = 0;
+  const layoutNode = (n, depth) => {
+    const kids = (childMap.get(Number(n.id)) || []).sort(sortById);
+    n._depth = depth;
+    n._kids = kids;
+    graphNodes.push(n);
+    if (!kids.length) { n._row = nextRow; nextRow += 1; return; }
+    kids.forEach((k) => layoutNode(k, depth + 1));
+    n._row = (kids[0]._row + kids[kids.length - 1]._row) / 2;
   };
-  const chain = roots.length
-    ? `<ul class="chain-tree">${roots.map(renderChainNode).join('')}</ul>`
-    : '<span class="tiny">此单据还没有上下游关联</span>';
+  roots.forEach((r, i) => {
+    if (i) nextRow += 1;
+    layoutNode(r, 0);
+  });
+  const compact = window.matchMedia && window.matchMedia('(max-width:900px)').matches;
+  const CARD_W = compact ? 116 : 190;
+  const CARD_H = compact ? 60 : 58;
+  const GAP_X = compact ? 28 : 86;
+  const GAP_Y = compact ? 20 : 22;
+  const PAD = compact ? 6 : 8;
+  const maxDepth = Math.max(0, ...graphNodes.map((n) => n._depth));
+  const rows = Math.max(1, nextRow || 1);
+  const graphW = PAD * 2 + (maxDepth + 1) * CARD_W + maxDepth * GAP_X;
+  const graphH = PAD * 2 + rows * CARD_H + (rows - 1) * GAP_Y;
+  const nodeXY = (n) => ({
+    x: PAD + n._depth * (CARD_W + GAP_X),
+    y: PAD + n._row * (CARD_H + GAP_Y),
+  });
+  const edges = graphNodes.flatMap((p) => p._kids.map((k) => {
+    const a = nodeXY(p), b = nodeXY(k);
+    const x1 = a.x + CARD_W, y1 = a.y + CARD_H / 2;
+    const x2 = b.x - 9, y2 = b.y + CARD_H / 2;
+    if (p._kids.length === 1) return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#chainArrow)"/>`;
+    const bx = x1 + Math.min(22, GAP_X / 2);
+    return `<path d="M${x1} ${y1} H${bx} V${y2} H${x2}" marker-end="url(#chainArrow)"/>`;
+  })).join('');
+  const graphCards = graphNodes.map((n) => {
+    const { x, y } = nodeXY(n);
+    return `<div class="flow-node ${Number(n.id) === Number(d.id) ? 'on' : ''}" style="left:${x}px;top:${y}px;width:${CARD_W}px;height:${CARD_H}px" data-go="${n.id}">
+        <div class="flow-main"><b>${typeLabel(n.type)}</b><span class="st">${statusLabel(n.type, n.status)}</span></div>
+        <span class="n">${esc(n.doc_no)}</span>
+      </div>`;
+  }).join('');
+  const chain = roots.length ? `<div class="chain-graph" style="width:${graphW}px;height:${graphH}px">
+      <svg class="chain-links" width="${graphW}" height="${graphH}" aria-hidden="true">
+        <defs><marker id="chainArrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+          <path d="M0 0 L7 3.5 L0 7" fill="#9aa7b8" stroke="none"/>
+        </marker></defs>${edges}
+      </svg>${graphCards}
+    </div>` : '<span class="tiny">此单据还没有上下游关联</span>';
 
   const statusOpts = state.meta.statuses[d.type].map((s) => `<option value="${s.key}" ${s.key === d.status ? 'selected' : ''}>${s.label}</option>`).join('');
   const files = d.files.map((f) => fileRow(f)).join('');
@@ -170,7 +213,7 @@ async function pageDocDetail(q, my) {
         ${canDelete ? '<button class="btn danger" id="btnDel">删除</button>' : ''}
       </div>
     </div>
-    <div class="chain" style="display:block">${chain}</div>
+    <div class="chain">${chain}</div>
 
     <div class="card">
       <div class="kv">

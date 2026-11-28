@@ -136,20 +136,19 @@ table.tb tr.clickable{cursor:pointer}
 .doc-hero .no{font-size:24px;font-weight:700;letter-spacing:.6px}
 .doc-meta{display:flex;gap:22px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin-top:6px}
 .doc-meta b{color:var(--ink);font-weight:600}
-.chain{display:flex;align-items:center;gap:8px;flex-wrap:wrap;overflow-x:auto;padding:12px;background:#fafbfd;border:1px dashed #dde5f1;border-radius:10px;margin-bottom:16px}
-.chain .node{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer}
-.chain .node:hover{border-color:var(--brand-2)}
-.chain .node.on{border-color:var(--brand);background:var(--brand-soft)}
-.chain .node .n{display:block;font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--muted)}
-.chain .arrow{color:#9aa5b7}
-.chain-tree{list-style:none;margin:0;padding:0;min-width:max-content}
-.chain-tree ul{list-style:none;margin:6px 0 0 18px;padding-left:14px;border-left:1px dashed #d8e1ee}
-.chain-tree li{margin:6px 0}
-.chain-tree .node{display:inline-flex;align-items:center;gap:7px;max-width:100%}
-.chain-tree .node b{font-weight:600;font-size:12.5px;white-space:nowrap}
-.chain-tree .node .n{display:inline;font-size:10.5px;white-space:nowrap}
-.chain-tree .node .st{font-size:10.5px;color:#8a96a8;border:1px solid #e3e9f2;border-radius:99px;padding:0 6px;white-space:nowrap}
-.chain-tree .node.on .st{color:var(--brand);border-color:#c9dbf3}
+.chain{display:block;overflow-x:auto;padding:14px 16px;background:#fafbfd;border:1px dashed #dde5f1;border-radius:10px;margin-bottom:16px}
+.chain-graph{position:relative;margin:0 auto}
+.chain-links{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.chain-links line,.chain-links path{fill:none;stroke:#9aa7b8;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.chain-links marker path{fill:#9aa7b8;stroke:none}
+.flow-node{position:absolute;display:flex;flex-direction:column;justify-content:center;gap:2px;box-sizing:border-box;padding:7px 11px;background:#fff;border:1px solid #b9c4d2;border-radius:10px;box-shadow:0 1px 2px rgba(31,50,79,.05);cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s}
+.flow-node:hover{border-color:var(--brand-2);box-shadow:0 3px 8px rgba(31,50,79,.1)}
+.flow-node.on{border-color:var(--brand);background:var(--brand-soft);box-shadow:0 0 0 3px rgba(47,111,208,.12)}
+.flow-main{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.flow-main b{font-weight:600;font-size:13px;white-space:nowrap}
+.flow-node .n{font-family:ui-monospace,Consolas,monospace;font-size:10.5px;color:var(--muted);white-space:nowrap}
+.flow-node .st{font-size:10px;color:#7b8799;border:1px solid #e3e9f2;border-radius:99px;padding:0 6px;white-space:nowrap;line-height:16px}
+.flow-node.on .st{color:var(--brand);border-color:#c9dbf3}
 .kv{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 18px}
 .kv .k{font-size:11.5px;color:var(--muted)}
 .kv .v{font-size:13.5px;margin-top:1px}
@@ -448,6 +447,11 @@ table.tb tr.clickable{cursor:pointer}
   .page-head .actions .btn{flex:1 1 auto;justify-content:center}
   .card{padding:14px;overflow-x:auto}
   .card>h3{position:sticky;left:0}
+  .chain{padding:10px 8px}
+  .flow-node{padding:6px 8px}
+  .flow-main b{font-size:12px}
+  .flow-node .n{font-size:9.5px}
+  .flow-node .st{font-size:9px;padding:0 4px;line-height:15px}
   .toolbar form{flex-wrap:wrap}
   .search{min-width:0;flex:1 1 170px}
   .search .input{width:100%}
