@@ -13,19 +13,22 @@ async function pageWarehouse(q, my) {
   if (my !== seq) return;
 
   const labels = data.labels || {};
+  const isWh = state.user.role === 'warehouse';
   const statusTabs = [['pending', '待接收'], ['received', '处理中'], ['done', '已完成'], ['all', '全部']];
   const badgeCls = (s) => s === 'done' ? 'accepted' : (s === 'received' ? 'sent' : 'draft');
 
   const rows = data.items.map((d) => {
     const w = d.warehouse_status;
-    const actions = w === 'pending'
-      ? `<button class="btn sm primary" data-receive="${d.id}">接收并编辑</button>
+    const actions = !isWh
+      ? `<a class="btn sm" href="#/doc?id=${d.id}">查看</a>`
+      : w === 'pending'
+        ? `<button class="btn sm primary" data-receive="${d.id}">接收并编辑</button>
          <a class="btn sm" href="#/doc?id=${d.id}">查看</a>`
-      : w === 'received'
-        ? `<button class="btn sm primary" data-done="${d.id}">完成</button>
+        : w === 'received'
+          ? `<button class="btn sm primary" data-done="${d.id}">完成</button>
            <a class="btn sm" href="#/doc/edit?id=${d.id}">编辑</a>
            <a class="btn sm" href="#/doc/edit?id=${d.id}&print=1">打印</a>`
-        : `<a class="btn sm" href="#/doc?id=${d.id}">查看</a>
+          : `<a class="btn sm" href="#/doc?id=${d.id}">查看</a>
            <a class="btn sm" href="#/doc/edit?id=${d.id}&print=1">打印</a>`;
     return `<tr data-id="${d.id}">
       <td class="mono">${esc(d.doc_no)}</td>
@@ -42,7 +45,7 @@ async function pageWarehouse(q, my) {
   const pages = Math.max(1, Math.ceil(data.total / data.page_size));
   const tabHref = (s) => '#/warehouse?' + new URLSearchParams({ ...(s ? { status: s } : {}), ...(kw ? { q: kw } : {}) }).toString();
   const v = view(`
-    <div class="page-head"><div><h2>仓库打单</h2><div class="desc">业务员在单据详情点“交仓库”后，送货单会出现在这里；接收后可编辑、打印并完成</div></div></div>
+    <div class="page-head"><div><h2>仓库打单</h2><div class="desc">${isWh ? '业务员提交送货单后，在这里接收、编辑、打印并完成；接收前业务员可撤回' : '管理员只读查看仓库队列；接收、编辑、打印和完成由仓库账号操作'}</div></div></div>
     <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
       <div class="stat"><div class="k">待接收</div><div class="v">${data.stats.pending}</div><div class="s">其他用户刚提交的送货单</div><div class="bar"></div></div>
       <div class="stat"><div class="k">处理中</div><div class="v">${data.stats.received}</div><div class="s">已接收，可编辑和打印</div><div class="bar"></div></div>

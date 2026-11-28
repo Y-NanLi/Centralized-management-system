@@ -479,7 +479,7 @@ const PROFILES = {
   tri: {
     key:'tri', name:'三联纸 214.7×139.8mm（针式打印机）',
     pageW:608.4, pageH:396, x0:19.2, tableW:570,
-    colRatios:[0.045,0.095,0.098,0.265,0.075,0.052,0.060,0.115,0.195],
+    colRatios:[0.043,0.112,0.129,0.275,0.060,0.069,0.103,0.070,0.070],
     labelRatios:[0,0.315,0.615], valueRatios:[0.098,0.407,0.717],
     titleSize:15.5, titleY:34,
     infoBaselines:[54,71.5,89],
@@ -492,7 +492,7 @@ const PROFILES = {
   a4: {
     key:'a4', name:'A4 纸（激光 / 喷墨）',
     pageW:595.32, pageH:841.92, x0:29.4, tableW:516.3,
-    colRatios:[28.4/516.3,46.8/516.3,67.7/516.3,100.8/516.3,51.1/516.3,36/516.3,36.8/516.3,73.4/516.3,75.3/516.3],
+    colRatios:[0.043,0.112,0.129,0.275,0.060,0.069,0.103,0.070,0.070],
     labelRatios:[0.0033,0.3033,0.6048], valueRatios:[0.098,0.3969,0.7062],
     titleSize:20.04, titleY:86.69,
     infoBaselines:[110.94,127.24,143.54],
@@ -509,24 +509,25 @@ const COLS = [
   {k:'code',     d:'存货编号'},
   {k:'name',     d:'存货名称'},
   {k:'spec',     d:'规格型号'},
-  {k:'proj',     d:'项目编号'},
   {k:'unit',     d:'单位'},
   {k:'qty',      d:'数量'},
+  {k:'proj',     d:'项目编号'},
   {k:'pin',      d:'品号'},
   {k:'contract', d:'合同编号'}
 ];
 const HEADS = COLS.map(c=>c.d);
 const KEYS  = COLS.map(c=>c.k);
-const ITEM_KEYS = ['code','name','spec','proj','unit','qty','pin','contract'];
-/* 默认宽度权重：取三联纸版式实测列宽，单位千分之一 */
+const ITEM_KEYS = ['code','name','spec','unit','qty','proj','pin','contract'];
+/* 默认宽度权重：三联纸 7 列铺满，品号/合同编号默认隐藏 */
 function defaultCols(){
   return COLS.map((c,i)=>({
-    k:c.k, name:c.d, on:true,
+    k:c.k, name:c.d, on: c.k!=='pin' && c.k!=='contract',
     w: Math.round(PROFILES.tri.colRatios[i]*1000)
   }));
 }
 function loadCols(set){
   const def = defaultCols();
+  if(set && set.colsCustom !== true) return def;
   const saved = set && Array.isArray(set.cols)? set.cols : null;
   if(!saved || !saved.length) return def;
   const out = [];
@@ -1933,13 +1934,13 @@ function showCols(list){
     </table>
     <div class="helpText" style="margin-top:10px">
       注：序号列由软件自动填；「数量」列决定合计数字落在哪一格，删掉数量列则合计跟在小计/合计文字后面。
-      粘贴 Excel 仍按固定顺序识别（存货编号 → 名称 → 规格 → 项目编号 → 单位 → 数量 → 品号 → 合同编号），
+      粘贴 Excel 仍按固定顺序识别（存货编号 → 名称 → 规格 → 单位 → 数量 → 项目编号 → 品号 → 合同编号），
       被删掉的列对应的数据不会写进单里。
     </div>`, [
       {label:'恢复默认', act:()=>{
         UI.cols = defaultCols(); UI.colsCustom=false; colsDraft=null;
         closeModal(); renderItems(); renderPrint(); saveSettings();
-        toast('已恢复默认 9 列');
+        toast('已恢复默认 7 列');
       }},
       {label:'＋ 添加列', act:()=>{
         const cur = readCols();
@@ -2093,7 +2094,7 @@ function parseTSV(raw){
     if(cells.length>=9 && /^\d+$/.test(cells[0])) cells=cells.slice(1);
     while(cells.length<8) cells.push('');
     cells = cells.slice(0,8);
-    const it = {code:cells[0],name:cells[1],spec:cells[2],proj:cells[3],unit:cells[4],qty:cells[5],pin:cells[6],contract:cells[7]};
+    const it = {code:cells[0],name:cells[1],spec:cells[2],unit:cells[3],qty:cells[4],proj:cells[5],pin:cells[6],contract:cells[7]};
     if(Object.values(it).some(v=>v)) out.push(it);
   }
   return out;

@@ -4,6 +4,7 @@ import { view } from '../shell.js';
 
 /* ---------------- 单据列表 ---------------- */
 async function pageDocs(q, my) {
+  if (state.user.role === 'warehouse') { location.hash = '#/warehouse'; return; }
   const type = q.get('type') || '';
   const status = q.get('status') || '';
   const kw = q.get('q') || '';
@@ -118,14 +119,14 @@ async function pageDocDetail(q, my) {
   const w = d.warehouse_status || 'none';
   const wLabel = { none: '未提交', pending: '待仓库接收', received: '仓库处理中', done: '仓库已完成' }[w] || w;
   const wBadge = w === 'done' ? 'accepted' : (w === 'received' ? 'sent' : (w === 'pending' ? 'draft' : ''));
-  const canEdit = state.user.role !== 'warehouse' || w === 'received';
+  const canEdit = isWh ? w === 'received' : (canOwn && w === 'none');
   const canStatus = canOwn && state.user.role !== 'warehouse';
   const canDelete = canOwn;
   const whActions = d.type === 'delivery' ? [
-    (w === 'none' && canOwn && d.status !== 'canceled') ? '<button class="btn" id="btnSendWh">交仓库</button>' : '',
-    (w === 'pending' && canOwn) ? '<button class="btn" id="btnWithdrawWh">撤回</button>' : '',
-    (w === 'pending' && (isWh || state.user.role === 'admin')) ? '<button class="btn primary" id="btnReceiveWh">接收</button>' : '',
-    (w === 'received' && (isWh || state.user.role === 'admin')) ? '<button class="btn primary" id="btnDoneWh">完成</button>' : '',
+    (w === 'none' && isMine && d.status !== 'canceled') ? '<button class="btn" id="btnSendWh">交仓库</button>' : '',
+    (w === 'pending' && isMine) ? '<button class="btn" id="btnWithdrawWh">撤回</button>' : '',
+    (w === 'pending' && isWh) ? '<button class="btn primary" id="btnReceiveWh">接收</button>' : '',
+    (w === 'received' && isWh) ? '<button class="btn primary" id="btnDoneWh">完成</button>' : '',
   ].join('') : '';
 
   const v = view(`

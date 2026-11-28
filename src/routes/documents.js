@@ -85,6 +85,7 @@ export function register(router) {
   router.post('/api/documents', (ctx) => {
     const body = ctx.body || {};
     const type = ['quote', 'contract', 'delivery'].includes(body.type) ? body.type : 'quote';
+    if (isWarehouse(ctx.user) && type !== 'delivery') throw forbidden('仓库账号不能新建报价单或合同');
     const payload = body.payload && typeof body.payload === 'object'
       ? body.payload
       : defaultPayload(type, { company: (companyById(num(body.company_id)) || {}).code });
@@ -107,7 +108,11 @@ export function register(router) {
     const d = get('SELECT * FROM documents WHERE id=? AND deleted_at IS NULL', id);
     if (!d) throw notFound('单据不存在');
     assertDocumentAccess(ctx.user, d);
-    if (isWarehouse(ctx.user) && d.type === 'delivery' && d.warehouse_status === 'pending') throw bad('请先接收该送货单再编辑');
+    const w = d.warehouse_status || 'none';
+    if (d.type === 'delivery') {
+      if (w === 'pending') throw bad('送货单已提交仓库，接收前只能撤回，不能编辑');
+      if ((w === 'received' || w === 'done') && !isWarehouse(ctx.user)) throw forbidden('仓库流程中的送货单只能由仓库账号编辑');
+    }
     const body = ctx.body || {};
     const payload = body.payload && typeof body.payload === 'object' ? body.payload : null;
     const no = str(body.doc_no, 60) || d.doc_no;
@@ -164,6 +169,7 @@ export function register(router) {
   });
 
   router.post('/api/documents/:id/convert', (ctx) => {
+    if (isWarehouse(ctx.user)) throw forbidden('仓库账号不能生成合同或报价单');
     const id = Number(ctx.params.id);
     const src = docDetail(id, ctx.user);
     assertOwner(ctx.user, src);

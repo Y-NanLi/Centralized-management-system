@@ -30,6 +30,11 @@ const routes = {
   '/settings': pageSettings,
 };
 
+/* 仓库账号只保留仓库打单和送货单查看/编辑/打印，其余页面一律回到仓库打单 */
+const WAREHOUSE_ROUTES = new Set(['/warehouse', '/doc', '/doc/edit', '/print']);
+const SALES_BLOCKED = new Set(['/settings', '/users']);
+const homeHash = (role) => role === 'warehouse' ? '#/warehouse' : '#/dashboard';
+
 function logout(msg) {
   localStorage.removeItem('token');
   state.token = '';
@@ -52,7 +57,7 @@ function renderLogin(msg, mode = 'login') {
       <div class="field"><label>电话（可选）</label><input class="input" name="phone" placeholder="联系电话"></div>` : ''}
       <button class="btn primary" style="width:100%;justify-content:center;padding:10px" type="submit">${reg ? '注 册 并 登 录' : '登 录'}</button>
       <div class="login-note">登录不需要密码，凭用户名识别身份。用户名支持中文、字母、数字、下划线、点或短横。<br>
-      每个人只能看到自己的工作台和单据；管理员登录后可查看全部成员，并按成员切换工作台。</div>
+      每个人只能看到自己的工作台和单据；注册后默认为业务员，没有系统设置和用户管理；仓库账号只进入仓库打单。</div>
       <div class="login-switch">
         ${reg ? '已有用户名？<a href="#/login" id="toLogin">直接登录</a>' : '还没有用户名？<a href="#/login?mode=register" id="toRegister">注册一个</a>'}
       </div>
@@ -71,7 +76,7 @@ function renderLogin(msg, mode = 'login') {
       state.user = r.user;
       localStorage.setItem('token', r.token);
       await loadBase();
-      history.replaceState(null, '', '#/dashboard');
+      history.replaceState(null, '', homeHash(r.user.role));
       renderShell();
       route();
       const m = r.merged || {};
@@ -115,9 +120,17 @@ async function startGuest() {
 async function route() {
   if (!state.user) return;
   const r = parseHash();
+  if (state.user.role === 'warehouse' && !WAREHOUSE_ROUTES.has(r.path)) {
+    if (location.hash !== '#/warehouse') location.hash = '#/warehouse';
+    return;
+  }
+  if (state.user.role === 'sales' && SALES_BLOCKED.has(r.path)) {
+    location.hash = '#/dashboard';
+    return;
+  }
   if (r.path === '/login') {
     if (state.user.role === 'guest') { renderLogin(); return; }
-    location.hash = '#/dashboard';
+    location.hash = homeHash(state.user.role);
     return;
   }
   if (!document.getElementById('view')) renderShell();
@@ -148,7 +161,7 @@ async function boot() {
     state.user = r.user;
     await loadBase();
     renderShell();
-    if (!location.hash || location.hash === '#/login') history.replaceState(null, '', '#/dashboard');
+    if (!location.hash || location.hash === '#/login') history.replaceState(null, '', homeHash(r.user.role));
     route();
   } catch {
     state.token = '';

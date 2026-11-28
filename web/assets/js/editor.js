@@ -50,10 +50,18 @@ async function pageDocEdit(q, my) {
   const id = q.get('id');
   const d = await api('/documents/' + id);
   if (my !== seq) return;
-  if (state.user.role === 'warehouse' && d.type === 'delivery' && d.warehouse_status === 'pending') {
-    toast('请先在仓库打单页接收这张送货单', true);
-    location.hash = '#/doc?id=' + d.id;
-    return;
+  const w = d.warehouse_status || 'none';
+  if (d.type === 'delivery') {
+    if (w === 'pending') {
+      toast(state.user.role === 'warehouse' ? '请先在仓库打单页接收这张送货单' : '已提交仓库，接收前只能撤回，不能编辑', true);
+      location.hash = '#/doc?id=' + d.id;
+      return;
+    }
+    if ((w === 'received' || w === 'done') && state.user.role !== 'warehouse') {
+      toast('仓库流程中的送货单只能由仓库账号编辑', true);
+      location.hash = '#/doc?id=' + d.id;
+      return;
+    }
   }
   const ed = {
     id: d.id, type: d.type, payload: d.payload, status: d.status, doc_date: d.doc_date,

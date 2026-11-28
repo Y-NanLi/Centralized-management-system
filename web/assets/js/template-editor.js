@@ -106,7 +106,11 @@ function seed(ed, autoPrint) {
     localStorage.setItem('shd_draft_v1', JSON.stringify(deliveryState(ed, company)));
     let settings = {};
     try { settings = JSON.parse(localStorage.getItem('shd_settings_v1') || '{}') || {}; } catch { settings = {}; }
-    settings.layout = 'a4';
+    // 送货单默认三联纸；只在首次升级时纠正旧的强制 A4，之后用户手动切 A4 仍会记住
+    if (settings.layoutDefaultMigrated !== 'tri') {
+      settings.layout = 'tri';
+      settings.layoutDefaultMigrated = 'tri';
+    }
     settings.company = company.name;
     localStorage.setItem('shd_settings_v1', JSON.stringify(settings));
   }

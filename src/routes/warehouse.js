@@ -1,7 +1,7 @@
 import { all, get, run } from '../db.js';
 import { audit } from '../auth.js';
 import { bad, forbidden, notFound, str } from '../util.js';
-import { isAdmin, isWarehouse } from '../scope.js';
+import { isWarehouse } from '../scope.js';
 
 const W_LABEL = { none: '未提交', pending: '待接收', received: '处理中', done: '已完成' };
 
@@ -13,7 +13,7 @@ function loadDelivery(id) {
 }
 
 export function register(router) {
-  /* 仓库工作台：管理员和仓库角色可看全部已提交送货单 */
+  /* 仓库工作台：管理员只读查看，仓库账号接收/编辑/完成 */
   router.get('/api/warehouse/deliveries', (ctx) => {
     const status = str(ctx.query.get('status'), 20) || 'pending';
     const keyword = str(ctx.query.get('q'), 80);
@@ -52,7 +52,7 @@ export function register(router) {
     const isOwner = Number(d.owner_id) === Number(ctx.user.id);
 
     if (action === 'send') {
-      if (!isOwner && !isAdmin(ctx.user)) throw forbidden('只能提交自己的送货单');
+      if (!isOwner) throw forbidden('只能提交自己的送货单');
       if (d.status === 'canceled') throw bad('已取消的送货单不能提交仓库');
       if (['pending', 'received', 'done'].includes(d.warehouse_status)) throw bad('这张送货单已在仓库流程中');
       run(`UPDATE documents SET warehouse_status='pending', warehouse_at=?, warehouse_by=?,
@@ -62,14 +62,14 @@ export function register(router) {
     }
 
     if (action === 'withdraw') {
-      if (!isOwner && !isAdmin(ctx.user)) throw forbidden('只能撤回自己的送货单');
+      if (!isOwner) throw forbidden('只能撤回自己的送货单');
       if (d.warehouse_status !== 'pending') throw bad('仓库已接收，不能撤回');
       run("UPDATE documents SET warehouse_status='none', warehouse_at=NULL, warehouse_by=NULL, updated_at=? WHERE id=?", now, id);
       audit(ctx.user.id, 'warehouse.withdraw', d.doc_no, '撤回仓库提交', ctx.req.socket.remoteAddress);
       return { ok: true, warehouse_status: 'none' };
     }
 
-    if (!isAdmin(ctx.user) && !isWarehouse(ctx.user)) throw forbidden('只有仓库账号可以执行该操作');
+    if (!isWarehouse(ctx.user)) throw forbidden('只有仓库账号可以接收、编辑、打印或完成送货单');
 
     if (action === 'receive') {
       if (d.warehouse_status !== 'pending') throw bad('只有待接收的送货单可以接收');

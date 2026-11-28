@@ -4,7 +4,7 @@ import { app, state, api, esc, roleLabel } from './core.js';
 async function loadBase() {
   if (!state.meta) state.meta = await api('/meta');
   state.companies = await api('/companies');
-  state.customers = await api('/customers');
+  state.customers = state.user && state.user.role === 'warehouse' ? [] : await api('/customers');
   state.products = await api('/products');
   state.owners = state.user && state.user.role === 'admin' ? await api('/owners') : [];
 }
@@ -25,13 +25,18 @@ const NAV = [
 
 function renderShell() {
   const isGuest = state.user.role === 'guest';
-  const nav = NAV.filter((n) => (!n.admin || state.user.role === 'admin')
-    && (!n.warehouse || ['admin', 'warehouse'].includes(state.user.role))
-    && (!isGuest || n.key !== 'settings')).map((n) => `
+  const isWh = state.user.role === 'warehouse';
+  const hideSettings = ['guest', 'sales'].includes(state.user.role);
+  const nav = NAV.filter((n) => {
+    if (isWh) return n.key === 'warehouse';
+    return (!n.admin || state.user.role === 'admin')
+      && (!n.warehouse || ['admin', 'warehouse'].includes(state.user.role))
+      && (!hideSettings || n.key !== 'settings');
+  }).map((n) => `
     <a class="nav-item" data-nav="${n.key}" href="${n.href}"><span class="ic">${n.icon}</span>${n.label}</a>`).join('');
   app.innerHTML = `<div class="shell">
       <aside class="sidebar">
-        <div class="brand"><div class="brand-mark">集</div><div class="brand-text"><b>集中管理系统</b><span>报价 · 合同 · 送货单</span></div></div>
+        <div class="brand"><div class="brand-mark">集</div><div class="brand-text"><b>集中管理系统</b><span>${isWh ? '仓库打单' : '报价 · 合同 · 送货单'}</span></div></div>
         <nav class="nav">${nav}</nav>
         <div class="userbox">
           <div class="avatar">${esc((state.user.name || state.user.username).slice(0, 1))}</div>
@@ -41,7 +46,7 @@ function renderShell() {
       </aside>
       <div class="main">
         <div class="topbar"><div class="crumb" id="crumb">工作台</div><div class="spacer"></div>
-          <div class="tiny" id="topInfo">${isGuest ? '游客模式：数据仅属于本浏览器，别处看不到；注册账号可长期保存，登录时会自动并入账号' : (state.user.role === 'admin' ? '管理员：默认查看全部成员工作台，可按成员切换' : '当前只显示你自己的客户、货品、单据和文件')}</div></div>
+          <div class="tiny" id="topInfo">${isGuest ? '游客模式：数据仅属于本浏览器，别处看不到；注册账号可长期保存，登录时会自动并入账号' : (state.user.role === 'admin' ? '管理员：默认查看全部成员工作台，可按成员切换' : (isWh ? '仓库账号：只显示交到仓库的送货单，可接收、编辑、打印、完成' : '当前只显示你自己的客户、货品、单据和文件'))}</div></div>
         <div class="content" id="view"></div>
       </div>
     </div>`;
@@ -54,7 +59,9 @@ function renderShell() {
 }
 
 function setNav(key, crumb) {
-  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === key));
+  const k = state.user && state.user.role === 'warehouse' && ['docs', 'doc', 'doc/edit', 'print'].includes(key)
+    ? 'warehouse' : key;
+  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === k));
   const c = document.getElementById('crumb');
   if (c) c.textContent = crumb || '';
 }
