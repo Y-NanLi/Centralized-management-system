@@ -25,7 +25,8 @@ async function pageSettings(q, my) {
       v1.8.3 仓库可直接打印待接收送货单，打印时自动接收为“处理中”，编辑与完成权限仍仅限仓库账号。<br>
       v1.8.4 仓库可在仓库打单页直接手动新建送货单，无需接收业务员单据；保存后进入“处理中”，但仍不能新建报价单或合同。<br>
       v1.8.5 仓库打单默认进入“全部”页签，“全部”放在最左侧。<br>
-      v1.8.6 系统品牌名称改为“CRM系统”。</div>
+      v1.8.6 系统品牌名称改为“CRM系统”。<br>
+      v1.9.0 单据编号统一为“公司代码+日期+三位流水”（如 JXT-20261128001），报价、合同、送货单共用当天流水；转换单据继承原编号。</div>
     </div>
 
     <div class="card" style="margin-top:14px"><h3>数据备份</h3>
@@ -34,7 +35,7 @@ async function pageSettings(q, my) {
     </div>
 
     <div class="card" style="margin-top:14px"><h3>关于</h3>
-      <div class="tiny" style="line-height:2">CRM系统 v1.8.6 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
+      <div class="tiny" style="line-height:2">CRM系统 v1.9.0 · Node.js 22 + SQLite · 数据目录 data/（app.db 与 files/）<br>
       建议每天备份 data 目录；部署到 NAS 用 Docker 挂载 /app/data 即可。</div>
     </div>`, 'settings', '系统设置');
 

@@ -295,7 +295,7 @@ table.edit .mvBtn:hover{color:var(--accent)}
           <div class="grid">
             <label class="lbl">报价单号</label>
             <div style="display:flex;gap:6px">
-              <input class="field" data-k="no" placeholder="AC-20261126-01" style="flex:1 1 auto;min-width:0">
+              <input class="field" data-k="no" placeholder="JXT-20261128001" style="flex:1 1 auto;min-width:0">
               <button class="btn sm" id="btnGenNo" style="flex:0 0 auto" title="按当天日期重新生成">重生成</button>
             </div>
             <label class="lbl">报价日期</label>
@@ -752,20 +752,28 @@ const KEY_RECS = 'ac-quote-recs-v1';
 const KEY_OPTS = 'ac-quote-opts-v1';
 const KEY_CLIENTS = 'ac-quote-clients-v1';
 
+const noCode = () => (st.company === 'anch' ? 'AC' : String(st.company || 'jxt').toUpperCase());
+const noSeq = (n) => String(n).padStart(3, '0');
+
 function peekNo() {
   const y = ymd(new Date());
   let n = 0;
   try { const raw = JSON.parse(localStorage.getItem(KEY_SEQ) || '{}'); if (raw.day === y) n = raw.n || 0; } catch (e) {}
-  return 'AC-' + y + '-' + pad2(n + 1);
+  return 'JXT-' + y + noSeq(n + 1);
 }
 
 function genNo() {
   const d = new Date(), y = ymd(d);
   let n = 0;
   try { const raw = JSON.parse(localStorage.getItem(KEY_SEQ) || '{}'); if (raw.day === y) n = raw.n || 0; } catch (e) {}
+  try {
+    const cur = String((st && st.no) || '').trim();
+    const key = noCode() + '-' + y;
+    if (cur.indexOf(key) === 0) n = Math.max(n, parseInt(cur.slice(key.length), 10) || 0);
+  } catch (e) {}
   n += 1;
   try { localStorage.setItem(KEY_SEQ, JSON.stringify({ day: y, n: n })); } catch (e) {}
-  return 'AC-' + y + '-' + pad2(n);
+  return noCode() + '-' + y + noSeq(n);
 }
 
 function defState(useSeq) {

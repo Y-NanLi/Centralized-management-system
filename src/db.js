@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS documents (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_no ON documents(doc_no);
+CREATE INDEX IF NOT EXISTS idx_documents_no ON documents(doc_no);
 CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(type, status);
 CREATE INDEX IF NOT EXISTS idx_documents_customer ON documents(customer_id);
 CREATE INDEX IF NOT EXISTS idx_documents_owner ON documents(owner_id);
@@ -201,6 +201,10 @@ ensureColumn('files', 'deleted_by', 'deleted_by INTEGER');
 db.exec('CREATE INDEX IF NOT EXISTS idx_documents_warehouse ON documents(warehouse_status)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_documents_deleted ON documents(deleted_at)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(deleted_at)');
+
+/* ---------- v1.9 单据编号跨类型共用流水；报价转合同/送货单继承同一编号 ---------- */
+db.exec('DROP INDEX IF EXISTS idx_documents_no');
+db.exec('CREATE INDEX IF NOT EXISTS idx_documents_no ON documents(doc_no)');
 
 export function all(sql, ...params) {
   return db.prepare(sql).all(...params).map((r) => ({ ...r }));

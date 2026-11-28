@@ -22,23 +22,35 @@ export function companyByCode(code) {
     || get('SELECT * FROM companies ORDER BY id LIMIT 1');
 }
 
-/** 单据编号：公司代码-类型-日期-序号，如 JXT-HT-20261127-001 */
-export function nextNo(type, companyCode, subtype) {
+/** 单据编号：公司代码 + 日期 + 三位流水，如 JXT-20261128001；同一公司同一天跨单据类型共用流水 */
+function noKey(companyCode) {
   const code = String(companyCode || 'jxt').toUpperCase();
   const d = new Date();
   const p2 = (x) => String(x).padStart(2, '0');
-  const day = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}`;
-  let tc = TYPE_CODE[type] || 'BJ';
-  if (type === 'delivery') {
-    tc = subtype === '样品单' ? 'DB' : subtype === '提前送货单' ? 'TQ' : 'XS';
-  }
-  const key = `${code}-${tc}-${day}`;
+  return `${code}-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}`;
+}
+
+function nextNoValue(key) {
   const row = get('SELECT n FROM number_seq WHERE key=?', key);
-  const last = get('SELECT doc_no FROM documents WHERE doc_no LIKE ? ORDER BY doc_no DESC LIMIT 1', `${key}-%`);
-  const lastN = last ? Number(String(last.doc_no).slice(key.length + 1)) : 0;
-  const n = Math.max(row ? row.n : 0, Number.isFinite(lastN) ? lastN : 0) + 1;
+  const last = get(`SELECT MAX(CAST(substr(doc_no, ?) AS INTEGER)) AS n FROM documents
+    WHERE doc_no LIKE ?`, key.length + 1, `${key}%`);
+  return Math.max(row ? row.n : 0, last && Number.isFinite(Number(last.n)) ? Number(last.n) : 0) + 1;
+}
+
+function formatNo(key, n) {
+  return `${key}${String(n).padStart(3, '0')}`;
+}
+
+export function peekNextNo(companyCode) {
+  const key = noKey(companyCode);
+  return formatNo(key, nextNoValue(key));
+}
+
+export function nextNo(_type, companyCode, _subtype) {
+  const key = noKey(companyCode);
+  const n = nextNoValue(key);
   run('INSERT INTO number_seq (key,n) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET n=excluded.n', key, n);
-  return `${key}-${String(n).padStart(3, '0')}`;
+  return formatNo(key, n);
 }
 
 export function ensureCustomer(name, extra = {}, userId) {
@@ -181,7 +193,7 @@ export function createDocument(input, user) {
       phone: payload.cust && payload.cust.phone,
     }, ownerId);
     const no = str(input.doc_no, 60) || nextNo(type, company.code, payload.dtype);
-    if (get('SELECT id FROM documents WHERE doc_no=?', no)) {
+    if (!input.allow_duplicate_no && get('SELECT id FROM documents WHERE doc_no=?', no)) {
       throw new HttpError(400, '单据编号已存在：' + no, 'duplicate_no');
     }
     payload.no = payload.no || no;

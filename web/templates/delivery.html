@@ -2412,25 +2412,30 @@ function refresh(){
 }
 
 /* ============ 单据操作 ============ */
-/* 单据编号前缀按单据类型走：送货单 XS、样品单 DB、提前送货单 TQ（要改只改这一行） */
-const NO_PREFIX = {'送货单':'XS', '样品单':'DB', '提前送货单':'TQ'};
-function noPrefix(dtype){ return NO_PREFIX[String(dtype||'').trim()] || 'XS'; }
+/* 单据编号：公司代码 + 日期 + 三位流水，如 JXT-20261128001 */
+const COMPANY_CODE = {
+  '苏州捷信通信息技术有限公司': 'JXT',
+  '苏州悦智乐智能科技有限公司': 'YZL',
+  '苏州安驰电子科技有限公司': 'AC',
+};
+function noCode(){ return COMPANY_CODE[String(model.company||'').trim()] || 'JXT'; }
+function noKey(date){ return noCode() + '-' + String(date || today()).replace(/-/g, ''); }
 /* 只有本软件自己按规则生成的号才算「自动号」，自己填的其它格式一律不动 */
-function isAutoNo(no){ return /^(XS|DB|TQ)-\d{4}-\d{2}-\d{2}-\d+/.test(String(no||'').trim()); }
+function isAutoNo(no){ return /^(JXT|YZL|AC)-\d{8}\d{3,}/.test(String(no||'').trim()) || /^(XS|DB|TQ)-\d{4}-\d{2}-\d{2}-\d+/.test(String(no||'').trim()); }
 
 function nextNo(date){
-  const prefix = noPrefix(model.dtype) + '-' + (date || today()) + '-';
+  const key = noKey(date);
   let mx = 0;
   const eat = (no)=>{
     no = String(no||'');
-    if(no.indexOf(prefix) !== 0) return;
-    const n = parseInt(no.slice(prefix.length), 10);
+    if(no.indexOf(key) !== 0) return;
+    const n = parseInt(no.slice(key.length), 10);
     if(!isNaN(n)) mx = Math.max(mx, n);
   };
   (UI.recs||[]).forEach(r=> eat((r.data && r.data.no) || ''));
   // 手上这张要是已经是个更大的自动号（手动填的、复制来的），自动号接着往后排，绝不撞号
   eat(model.no);
-  return prefix + String(mx+1).padStart(5,'0');
+  return key + String(mx+1).padStart(3,'0');
 }
 /* 编号留空时，真正要印/要存的那一刻才补一个：按当天已存单据的流水往后排 */
 function ensureNo(){

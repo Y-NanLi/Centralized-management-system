@@ -1,7 +1,7 @@
 import { all, get, run } from '../db.js';
 import { audit } from '../auth.js';
 import { bad, notFound, str, num, nowISO } from '../util.js';
-import { saveUpload, nextNo, STATUSES, TYPE_LABEL } from '../service.js';
+import { saveUpload, peekNextNo, STATUSES, TYPE_LABEL } from '../service.js';
 import { assertOwner, requestedOwner } from '../scope.js';
 
 export function register(router) {
@@ -198,15 +198,9 @@ export function register(router) {
   }, { roles: ['admin', 'manager'] });
 
   /* ---------- 编号预览 ---------- */  router.get('/api/number/next', (ctx) => {
-    const type = String(ctx.query.get('type') || 'quote');
     const companyId = num(ctx.query.get('company_id'));
     const company = get('SELECT * FROM companies WHERE id=?', companyId) || get('SELECT * FROM companies ORDER BY id LIMIT 1');
     // 只预览，不落序号；正式创建时由事务分配
-    const now = new Date();
-    const p2 = (x) => String(x).padStart(2, '0');
-    const day = `${now.getFullYear()}${p2(now.getMonth() + 1)}${p2(now.getDate())}`;
-    const tc = type === 'quote' ? 'BJ' : type === 'contract' ? 'HT' : 'XS';
-    const row = get('SELECT n FROM number_seq WHERE key=?', `${company.code.toUpperCase()}-${tc}-${day}`);
-    return { doc_no: `${company.code.toUpperCase()}-${tc}-${day}-${String((row ? row.n : 0) + 1).padStart(3, '0')}` };
+    return { doc_no: peekNextNo(company.code) };
   });
 }

@@ -185,7 +185,7 @@ export function register(router) {
       const p = defaultPayload('contract', { company: src.company_code ? src.company_code.toLowerCase() : 'jxt' });
       p.company = q.company || p.company;
       p.date = new Date().toISOString().slice(0, 10);
-      p.no = '';
+      p.no = src.doc_no;
       p.taxRate = q.taxRate == null ? 13 : q.taxRate;
       p.cust = {
         name: q.cust && q.cust.name || src.customer_name || '',
@@ -200,6 +200,7 @@ export function register(router) {
         type: 'contract', company_id: src.company_id, customer_id: src.customer_id,
         doc_date: p.date, status: 'draft', payload: p, parent_id: src.id, root_id: src.root_id || src.id,
         title: `${p.cust.name} 销售合同`, remark: p.remark, owner_id: src.owner_id,
+        doc_no: src.doc_no, allow_duplicate_no: true,
       }, ctx.user);
       audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, '报价单转合同', ctx.req.socket.remoteAddress);
       return docDetail(doc.id, ctx.user);
@@ -210,7 +211,7 @@ export function register(router) {
       const p = defaultPayload('delivery', { company: src.company_code ? src.company_code.toLowerCase() : 'jxt' });
       p.company = q.company || p.company;
       p.date = new Date().toISOString().slice(0, 10);
-      p.no = '';
+      p.no = src.doc_no;
       p.dtype = '送货单';
       p.customer = name;
       p.items = (q.items || []).filter((it) => str(it.name) || str(it.spec)).map((it) => ({
@@ -229,6 +230,7 @@ export function register(router) {
         type: 'delivery', company_id: src.company_id, customer_id: src.customer_id,
         doc_date: p.date, status: 'draft', payload: p, parent_id: src.id, root_id: src.root_id || src.id,
         title: `${name} 送货单`, owner_id: src.owner_id,
+        doc_no: src.doc_no, allow_duplicate_no: true,
       }, ctx.user);
       audit(ctx.user.id, 'doc.convert', `${src.doc_no} → ${doc.doc_no}`, '转送货单', ctx.req.socket.remoteAddress);
       return docDetail(doc.id, ctx.user);
