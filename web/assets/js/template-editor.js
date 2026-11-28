@@ -1,5 +1,5 @@
 /* 直接调用三套独立生成器网页，通过 localStorage 注入数据、通过 bridge 回写集中系统 */
-import { state, api, esc, today, typeLabel, toast } from './core.js';
+import { state, api, esc, today, typeLabel, toast, modal } from './core.js';
 import { view } from './shell.js';
 
 function quoteState(ed, company) {
@@ -91,19 +91,19 @@ function seedProducts() {
   localStorage.setItem('shd_prod_v1', JSON.stringify({ v: 1, t: ps.map((p) => [p.spec || '', p.name || '', p.unit || '']) }));
 }
 
-function seed(ed, autoPrint) {
+function seed(ed, autoPrint, draftState = null) {
   const company = state.companies.find((c) => c.id === ed.company_id) || state.companies[0];
   if (!company) throw new Error('还没有公司主体，请先在基础资料里添加公司');
   const p = ed.payload || {};
 
   if (ed.type === 'quote') {
-    localStorage.setItem('ac-quote-draft-v1', JSON.stringify(quoteState(ed, company)));
-    seedCustomersQuote(p);
+    localStorage.setItem('ac-quote-draft-v1', JSON.stringify(draftState || quoteState(ed, company)));
+    seedCustomersQuote((draftState && draftState.cust) || p.cust || {});
   } else if (ed.type === 'contract') {
-    localStorage.setItem('sc-contract-draft-v1', JSON.stringify(contractState(ed, company)));
-    seedCustomersContract(p);
+    localStorage.setItem('sc-contract-draft-v1', JSON.stringify(draftState || contractState(ed, company)));
+    seedCustomersContract((draftState && draftState.cust) || p.cust || {});
   } else {
-    localStorage.setItem('shd_draft_v1', JSON.stringify(deliveryState(ed, company)));
+    localStorage.setItem('shd_draft_v1', JSON.stringify(draftState || deliveryState(ed, company)));
     let settings = {};
     try { settings = JSON.parse(localStorage.getItem('shd_settings_v1') || '{}') || {}; } catch { settings = {}; }
     // 送货单默认三联纸；只在首次升级时纠正旧的强制 A4，之后用户手动切 A4 仍会记住
@@ -127,12 +127,96 @@ function seed(ed, autoPrint) {
   }));
 }
 
-export function openTemplateEditor(ed, opts = {}) {
+const DRAFT_PREFIX = '__central_unsaved_draft_v1_';
+const DRAFT_MAX_AGE = 14 * 24 * 3600 * 1000;
+
+function draftKey(type, id) {
+  const uid = (state.user && state.user.id) || 'guest';
+  return `${DRAFT_PREFIX}${uid}_${type}_${Number(id) || 'new'}`;
+}
+function readDraft(type, id) {
+  try {
+    const d = JSON.parse(localStorage.getItem(draftKey(type, id)) || 'null');
+    if (!d || !d.state || typeof d.state !== 'object') return null;
+    if (!d.savedAt || Date.now() - Number(d.savedAt) > DRAFT_MAX_AGE) {
+      localStorage.removeItem(draftKey(type, id));
+      return null;
+    }
+    return d;
+  } catch { return null; }
+}
+function saveDraft(type, id, state, savedAt) {
+  if (!state || typeof state !== 'object') return;
+  try {
+    const text = JSON.stringify({ type, docId: Number(id) || 0, savedAt: Number(savedAt) || Date.now(), state });
+    if (text.length > 1024 * 1024) return; // 超长单据不挤占浏览器本地空间
+    localStorage.setItem(draftKey(type, id), text);
+  } catch { /* 本地存储满或被禁用时不影响编辑 */ }
+}
+function cleanupDrafts() {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith(DRAFT_PREFIX)) continue;
+      let d = null;
+      try { d = JSON.parse(localStorage.getItem(k) || 'null'); } catch { d = null; }
+      if (!d || !d.savedAt || Date.now() - Number(d.savedAt) > DRAFT_MAX_AGE) localStorage.removeItem(k);
+    }
+  } catch { /* ignore */ }
+}
+function removeDraft(type, id) {
+  try { localStorage.removeItem(draftKey(type, id)); } catch { /* ignore */ }
+}
+function draftSummary(draft) {
+  const s = draft.state || {};
+  const customer = (s.cust && s.cust.name) || s.customer || '未填客户';
+  const no = s.no || '未编号';
+  const items = Array.isArray(s.items) ? s.items.filter((x) => x && (x.name || x.spec)).length : 0;
+  return { customer, no, items };
+}
+function askRecoverDraft(ed, draft) {
+  const { customer, no, items } = draftSummary(draft);
+  const when = new Date(draft.savedAt).toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-');
+  return new Promise((resolve) => {
+    const m = modal({
+      title: '发现未保存的本地草稿',
+      body: `<p style="margin:0 0 10px;line-height:1.8">这张${typeLabel(ed.type)}在本浏览器有一份自动暂存的草稿，保存于 <b>${esc(when)}</b>。</p>
+        <div class="kv" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+          <div><div class="k">客户</div><div class="v">${esc(customer)}</div></div>
+          <div><div class="k">单号</div><div class="v">${esc(no)}</div></div>
+          <div><div class="k">有效明细</div><div class="v">${items} 行</div></div>
+        </div>
+        <p class="tiny" style="margin:0;line-height:1.8">恢复后继续编辑，只有点“保存 / 打印”才会写回系统；放弃则使用系统里的最近版本。</p>`,
+      footer: '<button class="btn" id="draftDiscard">放弃草稿</button><button class="btn" data-close>暂不恢复</button><button class="btn primary" id="draftRestore">恢复草稿</button>',
+    });
+    let done = false;
+    const finish = (value) => { if (done) return; done = true; m.close(); resolve(value); };
+    m.root.querySelector('#draftRestore').onclick = () => finish('restore');
+    m.root.querySelector('#draftDiscard').onclick = () => finish('discard');
+    m.root.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => finish('skip')));
+    m.root.addEventListener('click', (e) => { if (e.target === m.root) finish('skip'); });
+  });
+}
+
+export async function openTemplateEditor(ed, opts = {}) {
   const type = ed.type;
   const label = typeLabel(type);
   const autoPrint = opts.autoPrint === true;
 
-  try { seed(ed, autoPrint); }
+  let recovered = null;
+  cleanupDrafts();
+  if (ed.locked) removeDraft(type, ed.id);
+  const localDraft = ed.locked ? null : readDraft(type, ed.id);
+  if (localDraft) {
+    if (ed.id && ed.updated_at && Number(localDraft.savedAt) <= Date.parse(ed.updated_at)) {
+      removeDraft(type, ed.id);
+    } else {
+      const action = await askRecoverDraft(ed, localDraft);
+      if (action === 'restore') recovered = localDraft.state;
+      else if (action === 'discard') removeDraft(type, ed.id);
+    }
+  }
+
+  try { seed(ed, autoPrint, recovered); }
   catch (e) { toast(e.message, true); return; }
 
   const v = view(`<div class="tpl-overlay" id="tplOverlay">
@@ -140,6 +224,7 @@ export function openTemplateEditor(ed, opts = {}) {
       allow="clipboard-write; clipboard-read"
       src="/templates/${type}.html?central=1&doc=${Number(ed.id) || 0}&company_id=${Number(ed.company_id) || 0}&_=${Date.now()}"></iframe>
     <div class="tpl-loading" id="tplLoading"><span class="tpl-spin"></span><span>正在打开${esc(label)}生成器…</span></div>
+    <div class="draft-badge" id="draftBadge">本地草稿自动保存已开启</div>
   </div>`, 'docs', label + ' / 生成器');
 
   let currentId = Number(ed.id) || 0;
@@ -148,6 +233,11 @@ export function openTemplateEditor(ed, opts = {}) {
   const overlay = v.querySelector('#tplOverlay');
   const loading = v.querySelector('#tplLoading');
   const frame = v.querySelector('#tplFrame');
+  const badge = v.querySelector('#draftBadge');
+  if (recovered) {
+    badge.textContent = '已恢复本地草稿，保存后写入系统';
+    badge.classList.add('restored');
+  }
 
   const cleanup = () => {
     window.removeEventListener('message', onMessage);
@@ -172,9 +262,25 @@ export function openTemplateEditor(ed, opts = {}) {
       if (loading) loading.classList.add('hide');
       return;
     }
+    if (d.type === 'draft') {
+      if (!ed.locked) saveDraft(type, d.id || currentId, d.state, d.savedAt);
+      if (badge && d.savedAt) {
+        badge.textContent = '本地草稿已暂存 ' + new Date(d.savedAt).toLocaleTimeString('zh-CN', { hour12: false });
+        badge.classList.remove('restored', 'saved');
+      }
+      return;
+    }
     if (d.type === 'saved') {
+      const oldId = currentId;
       currentId = Number(d.id) || currentId;
       if (d.title) currentTitle = d.title;
+      removeDraft(type, oldId);
+      removeDraft(type, currentId);
+      if (badge) {
+        badge.textContent = '已保存到系统';
+        badge.classList.remove('restored');
+        badge.classList.add('saved');
+      }
       updateMeta(currentId, currentTitle);
       if (currentId) history.replaceState(null, '', `#/doc?id=${currentId}`);
       return;

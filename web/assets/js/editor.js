@@ -74,7 +74,7 @@ async function pageDocEdit(q, my) {
   const ed = {
     id: d.id, type: d.type, payload: d.payload, status: d.status, doc_date: d.doc_date,
     doc_no: d.doc_no, title: d.title, remark: d.remark, company_id: d.company_id, owner_name: d.owner_name,
-    locked: !!d.locked,
+    updated_at: d.updated_at, locked: !!d.locked,
   };
   if (!q.get('classic')) { openTemplateEditor(ed, { autoPrint: q.get('print') === '1' }); return; }
   openEditor(ed);

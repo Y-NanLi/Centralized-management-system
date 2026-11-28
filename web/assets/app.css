@@ -506,6 +506,9 @@ table.tb tr.chain-member:hover td{background:#f7fbff}
 .tpl-frame{display:block;width:100%;height:100%;border:0}
 .tpl-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#667085;font-size:14px;transition:opacity .2s}
 .tpl-loading.hide{opacity:0;pointer-events:none}
+.draft-badge{position:absolute;right:16px;bottom:16px;z-index:6;padding:6px 11px;border-radius:99px;background:rgba(31,50,79,.82);color:#fff;font-size:11.5px;line-height:1.3;box-shadow:0 4px 12px rgba(15,30,55,.18);pointer-events:none;opacity:.82}
+.draft-badge.restored{background:rgba(138,90,0,.9)}
+.draft-badge.saved{background:rgba(25,110,80,.9)}
 .tpl-spin{width:18px;height:18px;border:2px solid #d0d5dd;border-top-color:#2563eb;border-radius:50%;animation:tplSpin .8s linear infinite}
 @keyframes tplSpin{to{transform:rotate(360deg)}}
 

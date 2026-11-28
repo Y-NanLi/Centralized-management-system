@@ -133,6 +133,35 @@
   let inFlight = null;
   let queued = null;
   let lastSavedNo = '';
+  let baselineState = null;
+  let draftTimer = 0;
+
+  /* 草稿自动暂存：状态和刚打开时不同才通知父页面，避免初始加载就生成“假草稿” */
+  function queueDraft(state) {
+    if (meta.locked || !state || typeof state !== 'object' || !Object.keys(state).length) return;
+    let serialized = '';
+    try { serialized = JSON.stringify(state); } catch { return; }
+    if (baselineState == null) { baselineState = serialized; return; }
+    if (serialized === baselineState) return;
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      notify('draft', { id: meta.docId, state, savedAt: Date.now() });
+    }, 250);
+  }
+  function onUserEdit() {
+    if (meta.locked) return;
+    setTimeout(() => {
+      try { queueDraft(currentState()); } catch { /* 模板状态尚未就绪时跳过 */ }
+    }, 600);
+  }
+  document.addEventListener('input', onUserEdit, true);
+  document.addEventListener('change', onUserEdit, true);
+  document.addEventListener('paste', onUserEdit, true);
+  document.addEventListener('pointerup', (e) => {
+    const t = e.target;
+    if (t && t.closest && t.closest('.topbar')) return;
+    onUserEdit();
+  }, true);
 
   async function doSave(state, reason) {
     if (meta.locked) {
@@ -177,6 +206,8 @@
     meta.docNo = doc.doc_no || docNo;
     meta.title = doc.title || title;
     lastSavedNo = doc.doc_no || docNo;
+    try { baselineState = JSON.stringify(state); } catch { baselineState = null; }
+    clearTimeout(draftTimer);
     localStorage.setItem(META_KEY, JSON.stringify(meta));
     notify('saved', { id: meta.docId, doc_no: meta.docNo, title: meta.title || '', reason: reason || 'save' });
     say('已保存到CRM系统：' + (meta.docNo || ''));
@@ -312,6 +343,12 @@
     arrangeTopbar();
     applyLockedUi();
     ready();
+    setTimeout(() => {
+      try {
+        const s = currentState();
+        if (s && typeof s === 'object' && Object.keys(s).length) baselineState = JSON.stringify(s);
+      } catch { /* 模板尚未就绪时保留空基线，首次编辑会重新建立 */ }
+    }, 350);
     if (meta.autoPrint) setTimeout(() => {
       const b = document.querySelector('#btnPrint');
       if (b) b.click();
