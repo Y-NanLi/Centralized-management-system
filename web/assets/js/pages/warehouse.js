@@ -4,7 +4,7 @@ import { view } from '../shell.js';
 
 async function pageWarehouse(q, my) {
   if (!['admin', 'warehouse'].includes(state.user.role)) { location.hash = '#/dashboard'; return; }
-  const status = q.get('status') || 'pending';
+  const status = q.get('status') || 'all';
   const kw = q.get('q') || '';
   const page = Number(q.get('page') || 1);
   const params = new URLSearchParams({ status, page: String(page) });
@@ -14,7 +14,7 @@ async function pageWarehouse(q, my) {
 
   const labels = data.labels || {};
   const isWh = state.user.role === 'warehouse';
-  const statusTabs = [['pending', '待接收'], ['received', '处理中'], ['done', '已完成'], ['all', '全部']];
+  const statusTabs = [['all', '全部'], ['pending', '待接收'], ['received', '处理中'], ['done', '已完成']];
   const badgeCls = (s) => s === 'done' ? 'accepted' : (s === 'received' ? 'sent' : 'draft');
 
   const rows = data.items.map((d) => {
