@@ -19,17 +19,19 @@ async function pageWarehouse(q, my) {
 
   const rows = data.items.map((d) => {
     const w = d.warehouse_status;
+    const printBtn = `<button class="btn sm" data-print="${d.id}" data-w="${w}">打印</button>`;
     const actions = !isWh
       ? `<a class="btn sm" href="#/doc?id=${d.id}">查看</a>`
       : w === 'pending'
         ? `<button class="btn sm primary" data-receive="${d.id}">接收并编辑</button>
+         ${printBtn}
          <a class="btn sm" href="#/doc?id=${d.id}">查看</a>`
         : w === 'received'
           ? `<button class="btn sm primary" data-done="${d.id}">完成</button>
            <a class="btn sm" href="#/doc/edit?id=${d.id}">编辑</a>
-           <a class="btn sm" href="#/doc/edit?id=${d.id}&print=1">打印</a>`
+           ${printBtn}`
           : `<a class="btn sm" href="#/doc?id=${d.id}">查看</a>
-           <a class="btn sm" href="#/doc/edit?id=${d.id}&print=1">打印</a>`;
+           ${printBtn}`;
     return `<tr data-id="${d.id}">
       <td class="mono">${esc(d.doc_no)}</td>
       <td><b>${esc(d.customer_name || d.title || '—')}</b></td>
@@ -86,6 +88,17 @@ async function pageWarehouse(q, my) {
   });
   v.querySelectorAll('[data-done]').forEach((b) => b.onclick = async () => {
     try { await api(`/documents/${b.dataset.done}/warehouse`, { method: 'POST', body: { action: 'done' } }); toast('已完成'); rerender(); } catch (e) { toast(e.message, true); }
+  });
+  v.querySelectorAll('[data-print]').forEach((b) => b.onclick = async () => {
+    const id = b.dataset.print;
+    try {
+      // 待接收单先由仓库认领，未接收前仍不允许编辑；打印本身不受影响
+      if (b.dataset.w === 'pending') {
+        await api(`/documents/${id}/warehouse`, { method: 'POST', body: { action: 'receive' } });
+        toast('已接收，正在打开打印');
+      }
+      location.hash = `#/doc/edit?id=${id}&print=1`;
+    } catch (e) { toast(e.message, true); rerender(); }
   });
 }
 

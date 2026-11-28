@@ -184,7 +184,16 @@ async function pageDocDetail(q, my) {
   const go = (h) => { location.hash = h; };
   v.querySelectorAll('[data-go]').forEach((n) => n.onclick = () => go('#/doc?id=' + n.dataset.go));
   if (v.querySelector('#btnEdit')) v.querySelector('#btnEdit').onclick = () => go(`#/doc/edit?id=${d.id}`);
-  v.querySelector('#btnPrint').onclick = () => go(`#/doc/edit?id=${d.id}&print=1`);
+  v.querySelector('#btnPrint').onclick = async () => {
+    try {
+      // 仓库可以直接打印；待接收单先认领，避免打印视图被“未接收不能编辑”拦截
+      if (d.type === 'delivery' && isWh && w === 'pending') {
+        await api(`/documents/${d.id}/warehouse`, { method: 'POST', body: { action: 'receive' } });
+        toast('已接收，正在打开打印');
+      }
+      go(`#/doc/edit?id=${d.id}&print=1`);
+    } catch (e) { toast(e.message, true); }
+  };
   if (v.querySelector('#btnToContract')) v.querySelector('#btnToContract').onclick = () => convert(d.id, 'contract');
   if (v.querySelector('#btnToDelivery')) v.querySelector('#btnToDelivery').onclick = () => convert(d.id, 'delivery');
   const whAct = async (action, msg) => {
