@@ -8,12 +8,20 @@ async function pageDocs(q, my) {
   const type = q.get('type') || '';
   const status = q.get('status') || '';
   const kw = q.get('q') || '';
+  const from = q.get('from') || '';
+  const to = q.get('to') || '';
+  const customerId = q.get('customer_id') || '';
+  const quick = q.get('quick') || '';
   const owner = state.user.role === 'admin' ? (q.get('owner') || '') : '';
   const page = Number(q.get('page') || 1);
   const params = new URLSearchParams();
   if (type) params.set('type', type);
   if (status) params.set('status', status);
   if (kw) params.set('q', kw);
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (customerId) params.set('customer_id', customerId);
+  if (quick) params.set('quick', quick);
   if (owner) params.set('owner', owner);
   params.set('page', page);
   const data = await api('/documents?' + params.toString());
@@ -26,6 +34,15 @@ async function pageDocs(q, my) {
 
   const ownerOpts = state.user.role === 'admin' ? `<option value="">全部成员</option>` + state.owners.map((o) =>
     `<option value="${o.id}" ${String(o.id) === owner ? 'selected' : ''}>${esc(o.display_name)}${o.role === 'guest' ? '（游客）' : ''}</option>`).join('') : '';
+  const customerOpts = `<option value="">全部客户</option>` + state.customers.map((c) =>
+    `<option value="${c.id}" ${String(c.id) === customerId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  const quickOpts = [
+    ['', '普通筛选'],
+    ['quote_no_contract', '报价未转合同'],
+    ['contract_no_delivery', '合同未送货'],
+    ['delivery_pending', '送货待接收'],
+    ['delivery_received', '仓库处理中'],
+  ].map(([k, label]) => `<option value="${k}" ${k === quick ? 'selected' : ''}>${label}</option>`).join('');
 
   const typeOrder = { quote: 0, contract: 1, delivery: 2 };
   const docRow = (x, relation, inChain) => `<tr class="clickable ${inChain ? 'chain-member' : ''}" data-id="${x.id}" title="单击查看详情，双击进入编辑">
@@ -84,8 +101,12 @@ async function pageDocs(q, my) {
     }).join('');
   }).join('');
 
-  const pages = Math.max(1, Math.ceil(data.total / data.page_size));
-  const tabHref = (t) => '#/docs?' + new URLSearchParams({ ...(t ? { type: t } : {}), ...(owner ? { owner } : {}) }).toString();
+  const pages = Math.max(1, data.pages || Math.ceil(data.total / data.page_size));
+  const commonFilters = {
+    ...(owner ? { owner } : {}), ...(kw ? { q: kw } : {}), ...(status ? { status } : {}),
+    ...(from ? { from } : {}), ...(to ? { to } : {}), ...(customerId ? { customer_id: customerId } : {}),
+  };
+  const tabHref = (t) => '#/docs?' + new URLSearchParams({ ...commonFilters, ...(t ? { type: t } : {}) }).toString();
   const title = owner ? `${(state.owners.find((o) => String(o.id) === owner) || {}).display_name || '成员'}的单据` : '单据中心';
   const v = view(`
     <div class="page-head"><div><h2>${esc(title)}</h2><div class="desc">共 ${data.total} 张 · 编号全系统共用，遇到已占用号自动跳过 · 单击查看，双击编辑</div></div>
@@ -95,16 +116,22 @@ async function pageDocs(q, my) {
         <div style="display:flex;gap:4px;background:#f3f6fb;border-radius:9px;padding:3px">
           ${['', 'quote', 'contract', 'delivery'].map((t) => `<a class="btn ghost ${t === type ? 'primary' : ''}" style="border:0;padding:5px 12px" href="${tabHref(t)}">${t ? typeLabel(t) : '全部'}</a>`).join('')}
         </div>
-        <form id="fDoc" style="display:flex;gap:8px;align-items:center">
+        <form id="fDoc" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <div class="search"><input class="input" name="q" value="${esc(kw)}" placeholder="单号 / 客户 / 标题"></div>
-          <select class="input" name="status" style="width:130px"><option value="">全部状态</option>${statusOpts}</select>
-          ${ownerOpts ? `<select class="input" name="owner" style="width:150px">${ownerOpts}</select>` : ''}
+          <select class="input" name="quick" style="width:126px" title="快捷筛选">${quickOpts}</select>
+          <input class="input" type="date" name="from" value="${esc(from)}" style="width:132px" title="开始日期">
+          <span class="tiny">至</span>
+          <input class="input" type="date" name="to" value="${esc(to)}" style="width:132px" title="结束日期">
+          <select class="input" name="customer_id" style="width:150px" title="按客户筛选">${customerOpts}</select>
+          <select class="input" name="status" style="width:118px"><option value="">全部状态</option>${statusOpts}</select>
+          ${ownerOpts ? `<select class="input" name="owner" style="width:140px">${ownerOpts}</select>` : ''}
           <button class="btn">筛选</button>
+          <a class="btn ghost sm" href="#/docs">重置</a>
         </form>
         <div class="spacer"></div>
         <div class="tiny">第 ${data.page} / ${pages} 页</div>
-        ${page > 1 ? `<a class="btn sm" href="${hashWith(q, { page: page - 1 })}">上一页</a>` : ''}
-        ${page < pages ? `<a class="btn sm" href="${hashWith(q, { page: page + 1 })}">下一页</a>` : ''}
+        ${data.page > 1 ? `<a class="btn sm" href="${hashWith(q, { page: data.page - 1 })}">上一页</a>` : ''}
+        ${data.page < pages ? `<a class="btn sm" href="${hashWith(q, { page: data.page + 1 })}">下一页</a>` : ''}
       </div>
       <table class="tb"><thead><tr><th>类型</th><th>编号</th><th>客户</th><th>关联</th><th class="right">金额</th><th>状态</th><th>日期</th><th>制单人</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="8"><div class="empty"><b>暂无单据</b>${owner ? '该成员还没有单据' : '点右上角新建，或从旧系统导入备份'}</div></td></tr>`}</tbody></table>
@@ -128,9 +155,14 @@ async function pageDocs(q, my) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const np = new URLSearchParams();
-    if (type) np.set('type', type);
+    const nextQuick = fd.get('quick') || '';
+    if (type && !nextQuick) np.set('type', type);
+    if (nextQuick) np.set('quick', nextQuick);
     if (fd.get('q')) np.set('q', fd.get('q'));
     if (fd.get('status')) np.set('status', fd.get('status'));
+    if (fd.get('from')) np.set('from', fd.get('from'));
+    if (fd.get('to')) np.set('to', fd.get('to'));
+    if (fd.get('customer_id')) np.set('customer_id', fd.get('customer_id'));
     if (fd.get('owner')) np.set('owner', fd.get('owner'));
     location.hash = '#/docs' + (np.toString() ? '?' + np.toString() : '');
   };
@@ -248,8 +280,9 @@ async function pageDocDetail(q, my) {
   const w = d.warehouse_status || 'none';
   const wLabel = { none: '未提交', pending: '待仓库接收', received: '仓库处理中', done: '仓库已完成' }[w] || w;
   const wBadge = w === 'done' ? 'accepted' : (w === 'received' ? 'sent' : (w === 'pending' ? 'draft' : ''));
-  const canEdit = isWh ? w === 'received' : (canOwn && w === 'none');
+  const canEdit = isWh ? w === 'received' : (canOwn && w === 'none' && !d.locked);
   const canStatus = canOwn && state.user.role !== 'warehouse';
+  const canEditRemark = canOwn && d.locked && d.type !== 'delivery';
   const canDelete = canOwn;
   const whActions = d.type === 'delivery' ? [
     (w === 'none' && isMine && d.status !== 'canceled') ? '<button class="btn" id="btnSendWh">交仓库</button>' : '',
@@ -275,12 +308,14 @@ async function pageDocDetail(q, my) {
         <select class="input" id="selStatus" style="width:112px" ${canStatus ? '' : 'disabled title="仅制单人可改业务状态"'}>${statusOpts}</select>
         ${whActions}
         ${canEdit ? '<button class="btn" id="btnEdit">编辑</button>' : ''}
+        ${canEditRemark ? '<button class="btn" id="btnEditRemark">编辑备注</button>' : ''}
         <button class="btn primary" id="btnPrint">打印 / PDF</button>
         ${canConvertContract ? '<button class="btn" id="btnToContract">转合同</button>' : ''}
         ${canConvertDelivery ? '<button class="btn" id="btnToDelivery">转送货单</button>' : ''}
         ${canDelete ? '<button class="btn danger" id="btnDel">删除</button>' : ''}
       </div>
     </div>
+    ${d.locked ? `<div class="lock-note"><b>关键内容已锁定</b><span>该单据已生成 ${d.downstream_count} 张下游单据。为保证报价、合同、送货单金额一致，客户、明细、金额、日期、编号和供货主体不可再改；状态、备注和附件仍可维护。</span></div>` : ''}
     <div class="chain">${chain}</div>
 
     <div class="card">
@@ -326,6 +361,24 @@ async function pageDocDetail(q, my) {
     };
   });
   if (v.querySelector('#btnEdit')) v.querySelector('#btnEdit').onclick = () => go(`#/doc/edit?id=${d.id}`);
+  if (v.querySelector('#btnEditRemark')) v.querySelector('#btnEditRemark').onclick = () => {
+    const old = d.remark || p.remark || '';
+    const m = modal({
+      title: '编辑备注',
+      body: `<p class="tiny" style="margin:0 0 8px;line-height:1.7">这张${typeLabel(d.type)}已生成下游单据，金额和明细不能改，备注、状态和附件可以继续维护。</p>
+        <textarea class="input" id="lockRemark" rows="5" placeholder="填写内部备注">${esc(old)}</textarea>`,
+      footer: '<button class="btn" data-close>取消</button><button class="btn primary" id="lockRemarkSave">保存备注</button>',
+    });
+    m.root.querySelector('#lockRemarkSave').onclick = async () => {
+      const val = m.root.querySelector('#lockRemark').value;
+      try {
+        await api('/documents/' + d.id, { method: 'PUT', body: { remark: val } });
+        m.close();
+        toast('备注已更新');
+        rerender();
+      } catch (e) { toast(e.message, true); }
+    };
+  };
   v.querySelector('#btnPrint').onclick = async () => {
     try {
       // 仓库可以直接打印；待接收单先认领，避免打印视图被“未接收不能编辑”拦截

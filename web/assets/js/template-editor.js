@@ -123,6 +123,7 @@ function seed(ed, autoPrint) {
     companyId: company.id,
     title: ed.title || '',
     autoPrint: !!autoPrint,
+    locked: !!ed.locked,
   }));
 }
 

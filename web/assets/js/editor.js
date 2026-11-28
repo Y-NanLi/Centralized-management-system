@@ -53,6 +53,11 @@ async function pageDocEdit(q, my) {
   const id = q.get('id');
   const d = await api('/documents/' + id);
   if (my !== seq) return;
+  if (d.locked && q.get('print') !== '1') {
+    toast('该单据已生成下游单据，金额和明细已锁定；请在详情页修改状态或备注', true);
+    location.hash = '#/doc?id=' + d.id;
+    return;
+  }
   const w = d.warehouse_status || 'none';
   if (d.type === 'delivery') {
     if (w === 'pending') {
@@ -69,6 +74,7 @@ async function pageDocEdit(q, my) {
   const ed = {
     id: d.id, type: d.type, payload: d.payload, status: d.status, doc_date: d.doc_date,
     doc_no: d.doc_no, title: d.title, remark: d.remark, company_id: d.company_id, owner_name: d.owner_name,
+    locked: !!d.locked,
   };
   if (!q.get('classic')) { openTemplateEditor(ed, { autoPrint: q.get('print') === '1' }); return; }
   openEditor(ed);

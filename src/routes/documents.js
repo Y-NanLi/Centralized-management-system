@@ -16,6 +16,33 @@ function withPayload(row) {
   return { ...rest, payload };
 }
 
+/* 已派生下游单据后，只允许改状态、备注和附件；版式类字段不锁定 */
+const LOCK_EXEMPT = new Set(['remark', 'showLogo', 'showSign', 'stamp', 'cols', 'meta']);
+const NUMERIC_KEYS = new Set(['qty', 'price', 'taxRate', 'validDays', 'size', 'dx', 'dy', 'rot', 'ofs', 'fsTitle', 'fsInfo', 'fsItem']);
+function canonical(value, key = '') {
+  if (Array.isArray(value)) return value.map((x) => canonical(x, key));
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const k of Object.keys(value).sort()) out[k] = canonical(value[k], k);
+    return out;
+  }
+  if (typeof value === 'string' && NUMERIC_KEYS.has(key) && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return value;
+}
+function lockFingerprint(payload) {
+  const clean = {};
+  for (const k of Object.keys(payload || {})) {
+    if (!LOCK_EXEMPT.has(k)) clean[k] = payload[k];
+  }
+  return JSON.stringify(canonical(clean));
+}
+function hasDownstream(id) {
+  return !!get('SELECT id FROM documents WHERE parent_id=? AND deleted_at IS NULL LIMIT 1', id);
+}
+
 function docDetail(id, user) {
   const d = get(`SELECT d.*, c.name AS customer_name, c.addr AS customer_addr, c.contact AS customer_contact,
       c.phone AS customer_phone, c.fax AS customer_fax, co.code AS company_code, co.name AS company_name,
@@ -52,6 +79,8 @@ function docDetail(id, user) {
     WHERE df.document_id=? AND f.deleted_at IS NULL ORDER BY df.id DESC`, id);
   out.children = all(`SELECT id,doc_no,type,status,doc_date,amount,title FROM documents
     WHERE parent_id=? AND deleted_at IS NULL${isWarehouse(user) ? " AND type='delivery'" : ''} ORDER BY id`, id);
+  out.downstream_count = out.children.length;
+  out.locked = out.downstream_count > 0;
   out.parent = (d.parent_id && !isWarehouse(user)) ? get(`SELECT id,doc_no,type,status FROM documents
     WHERE id=? AND deleted_at IS NULL`, d.parent_id) : null;
   return out;
@@ -67,7 +96,7 @@ export function register(router) {
     const companyId = num(q.get('company_id'));
     const from = q.get('from');
     const to = q.get('to');
-    const page = Math.max(1, num(q.get('page'), 1));
+    const quick = String(q.get('quick') || '');
     const pageSize = Math.min(100, Math.max(5, Number(q.get('page_size')) || 20));
     const where = ['d.deleted_at IS NULL'];
     const params = [];
@@ -83,9 +112,46 @@ export function register(router) {
       where.push('(d.doc_no LIKE ? OR d.title LIKE ? OR c.name LIKE ?)');
       params.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
     }
+    if (quick === 'quote_no_contract') {
+      where.push(`d.type='quote' AND d.status<>'closed' AND NOT EXISTS (SELECT 1 FROM documents x
+        WHERE x.parent_id=d.id AND x.type='contract' AND x.deleted_at IS NULL)`);
+    } else if (quick === 'contract_no_delivery') {
+      where.push(`d.type='contract' AND d.status<>'canceled' AND NOT EXISTS (SELECT 1 FROM documents x
+        WHERE x.parent_id=d.id AND x.type='delivery' AND x.deleted_at IS NULL)`);
+    } else if (quick === 'delivery_pending') {
+      where.push(`d.type='delivery' AND d.warehouse_status='pending'`);
+    } else if (quick === 'delivery_received') {
+      where.push(`d.type='delivery' AND d.warehouse_status='received'`);
+    }
     const sqlWhere = where.length ? 'WHERE ' + where.join(' AND ') : '';
-    const total = get(`SELECT COUNT(*) AS c FROM documents d LEFT JOIN customers c ON c.id=d.customer_id ${sqlWhere}`, ...params).c;
-    const rows = all(`SELECT d.id,d.doc_no,d.type,d.status,d.warehouse_status,d.warehouse_at,
+
+    /* 先按业务链分组，再按“每组尽量整链放进同一页”的规则分页，保证同一链不跨页 */
+    const groups = all(`SELECT COALESCE(NULLIF(d.root_id,0),d.id) AS gid, COUNT(*) AS c,
+        MAX(d.doc_date) AS last_date, MAX(d.id) AS last_id
+      FROM documents d
+      LEFT JOIN customers c ON c.id=d.customer_id
+      ${sqlWhere}
+      GROUP BY gid
+      ORDER BY last_date DESC, last_id DESC`, ...params);
+    const pageGroups = [];
+    let current = [];
+    let used = 0;
+    for (const g of groups) {
+      if (current.length && used + Number(g.c) > pageSize) {
+        pageGroups.push(current);
+        current = [];
+        used = 0;
+      }
+      current.push(g);
+      used += Number(g.c);
+    }
+    if (current.length) pageGroups.push(current);
+    const pages = Math.max(1, pageGroups.length);
+    const page = Math.min(Math.max(1, num(q.get('page'), 1)), pages);
+    const selected = pageGroups[page - 1] || [];
+    const total = groups.reduce((s, g) => s + Number(g.c), 0);
+    const gids = selected.map((g) => g.gid);
+    const rows = gids.length ? all(`SELECT d.id,d.doc_no,d.type,d.status,d.warehouse_status,d.warehouse_at,
         d.doc_date,d.amount,d.title,d.customer_id,d.company_id,
         d.parent_id,d.root_id,d.created_at,d.updated_at,c.name AS customer_name,co.code AS company_code,co.name AS company_name,
         rd.doc_no AS root_doc_no, rd.type AS root_type,
@@ -96,9 +162,9 @@ export function register(router) {
       LEFT JOIN companies co ON co.id=d.company_id
       LEFT JOIN users u ON u.id=d.owner_id
       LEFT JOIN documents rd ON rd.id=d.root_id
-      ${sqlWhere}
-      ORDER BY d.doc_date DESC, d.id DESC LIMIT ? OFFSET ?`, ...params, pageSize, (page - 1) * pageSize);
-    return { items: rows, total, page, page_size: pageSize };
+      ${sqlWhere} AND COALESCE(NULLIF(d.root_id,0),d.id) IN (${gids.map(() => '?').join(',')})
+      ORDER BY d.doc_date DESC, d.id DESC`, ...params, ...gids) : [];
+    return { items: rows, total, page, pages, page_size: pageSize };
   });
 
   router.get('/api/documents/:id', (ctx) => docDetail(Number(ctx.params.id), ctx.user));
@@ -143,6 +209,29 @@ export function register(router) {
     const body = ctx.body || {};
     const payload = body.payload && typeof body.payload === 'object' ? body.payload : null;
     const no = str(body.doc_no, 60) || d.doc_no;
+    const oldPayload = (() => {
+      try { return JSON.parse(d.payload || '{}'); } catch { return {}; }
+    })();
+
+    /* 已生成下游单据：编号、日期、主体、客户、金额、明细、条款锁定，只允许改状态、备注和附件 */
+    if (hasDownstream(id)) {
+      const nextCompany = body.company_id == null ? d.company_id : num(body.company_id);
+      const nextDate = str(body.doc_date, 20) || d.doc_date;
+      const nextTax = body.tax_rate == null ? d.tax_rate : num(body.tax_rate);
+      const nextAmount = payload ? docAmount(payload, d.type) : (body.amount == null ? d.amount : money(body.amount));
+      const nextCustomer = body.customer_id == null ? d.customer_id : num(body.customer_id);
+      const changed = [];
+      if (payload && lockFingerprint(payload) !== lockFingerprint(oldPayload)) changed.push('客户/明细');
+      if (nextCustomer !== d.customer_id) changed.push('客户');
+      if (no !== d.doc_no) changed.push('编号');
+      if (Number(nextCompany) !== Number(d.company_id)) changed.push('供货主体');
+      if (nextDate !== d.doc_date) changed.push('日期');
+      if (Number(nextTax) !== Number(d.tax_rate)) changed.push('税率');
+      if (Number(nextAmount) !== Number(d.amount)) changed.push('金额');
+      if (changed.length) {
+        throw bad(`该单据已生成下游单据，${changed.join('、')}已锁定；只能修改状态、备注和附件。如需改价请先处理下游单据`);
+      }
+    }
     if (no !== d.doc_no && get('SELECT id FROM documents WHERE doc_no=? AND id<>?', no, id)) throw bad('单据编号已存在');
     const custName = payload ? ((payload.cust && payload.cust.name) || payload.customer || '') : '';
     const ownerId = d.owner_id || ctx.user.id;
@@ -154,6 +243,14 @@ export function register(router) {
       }, ownerId) || d.customer_id)
       : (body.customer_id == null ? d.customer_id : num(body.customer_id));
     const amount = payload ? docAmount(payload, d.type) : (body.amount == null ? d.amount : money(body.amount));
+    let storedPayload = d.payload;
+    if (payload) storedPayload = JSON.stringify(payload);
+    else if (body.remark != null && oldPayload && typeof oldPayload === 'object') {
+      try {
+        oldPayload.remark = str(body.remark, 500);
+        storedPayload = JSON.stringify(oldPayload);
+      } catch { /* 保持原 payload */ }
+    }
     run(`UPDATE documents SET doc_no=?, status=?, company_id=?, customer_id=?, doc_date=?, amount=?, tax_rate=?,
         title=?, remark=?, payload=?, updated_at=? WHERE id=?`,
       no,
@@ -165,7 +262,7 @@ export function register(router) {
       body.tax_rate == null ? d.tax_rate : num(body.tax_rate),
       str(body.title, 120) || d.title,
       body.remark == null ? d.remark : str(body.remark, 500),
-      payload ? JSON.stringify(payload) : d.payload,
+      storedPayload,
       new Date().toISOString(), id);
     if (payload) saveProducts(payload.items || [], payload.items && payload.items[0] ? payload.items[0].unit : '', ownerId);
     audit(ctx.user.id, 'doc.update', no, TYPE_LABEL[d.type], ctx.req.socket.remoteAddress);
@@ -206,6 +303,11 @@ export function register(router) {
     if (to === 'contract' && src.type === 'quote') {
       const existing = get(`SELECT * FROM documents WHERE parent_id=? AND type='contract' AND deleted_at IS NULL
         ORDER BY id DESC LIMIT 1`, src.id);
+      if (existing && mode === 'overwrite') {
+        const delivery = get(`SELECT id,doc_no,warehouse_status FROM documents
+          WHERE parent_id=? AND type='delivery' AND deleted_at IS NULL ORDER BY id DESC LIMIT 1`, existing.id);
+        if (delivery) throw bad(`该销售合同已生成送货单 ${delivery.doc_no}，不能覆盖；请选择另存新合同`);
+      }
       const q = src.payload;
       const p = defaultPayload('contract', { company: src.company_code ? src.company_code.toLowerCase() : 'jxt' });
       p.company = q.company || p.company;

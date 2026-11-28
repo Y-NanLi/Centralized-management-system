@@ -24,6 +24,7 @@
   meta.status = meta.status || 'draft';
   meta.companyId = Number(meta.companyId || params.get('company_id') || 0) || 0;
   meta.autoPrint = meta.autoPrint === true || params.get('print') === '1';
+  meta.locked = meta.locked === true;
 
   const KEY_CODE = { jxt: 'jxt', yzl: 'yzl', anch: 'ac' };
   const ready = () => window.parent && window.parent !== window
@@ -134,6 +135,10 @@
   let lastSavedNo = '';
 
   async function doSave(state, reason) {
+    if (meta.locked) {
+      say('该单据已生成下游单据，关键内容已锁定，这里只能查看和打印');
+      return true;
+    }
     const company = await resolveCompany(state);
     const companyId = company ? company.id : meta.companyId;
     let payload;
@@ -282,8 +287,30 @@
   /* 测试/排查用：不通过模板 UI 也能直接触发一次系统保存。 */
   window.__templateBridge = { meta, push, currentState, save: () => push(currentState(), 'manual') };
 
+  /* 已生下游的系统单据进入模板时只读，避免在生成器里改出与系统不一致的金额 */
+  function applyLockedUi() {
+    if (!meta.locked) return;
+    const allow = new Set(['btnPrint', 'btnPdf', 'btnWord', 'btnHelp', 'centralBackBtn']);
+    document.querySelectorAll('input, textarea, select').forEach((el) => {
+      if (el.closest('.topbar')) return;
+      if (el.tagName === 'SELECT' || el.type === 'checkbox' || el.type === 'radio') el.disabled = true;
+      else el.readOnly = true;
+    });
+    document.querySelectorAll('button').forEach((b) => {
+      if (!allow.has(b.id)) b.disabled = true;
+    });
+    const note = document.createElement('div');
+    note.id = 'centralLockedNote';
+    note.textContent = '该单据已生成下游单据，金额、明细、客户等关键内容已锁定；这里只能查看、打印和导出，状态与备注请回系统详情页修改。';
+    note.style.cssText = 'position:sticky;top:0;z-index:20;padding:9px 14px;background:#fff8e8;border-bottom:1px solid #f0dcb4;color:#7a5b22;font:12px/1.7 system-ui,-apple-system,"Microsoft YaHei",sans-serif';
+    const bar = document.querySelector('.topbar');
+    if (bar && bar.parentNode) bar.parentNode.insertBefore(note, bar.nextSibling);
+    else document.body.insertBefore(note, document.body.firstChild);
+  }
+
   setTimeout(() => {
     arrangeTopbar();
+    applyLockedUi();
     ready();
     if (meta.autoPrint) setTimeout(() => {
       const b = document.querySelector('#btnPrint');
